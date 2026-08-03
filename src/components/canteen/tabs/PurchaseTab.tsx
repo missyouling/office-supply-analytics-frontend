@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { showToast } from '@/components/ui/toaster';
 import { canteenApi } from '@/lib/api';
-import { Plus, Pencil, Trash2, X, Download, Save } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Download, Save, Eye, Printer } from 'lucide-react';
 
 const fmt = (n: any) => `¥${Number(n || 0).toFixed(2)}`;
 
@@ -32,6 +32,9 @@ function PurchasePanel() {
   const [rowKeyword, setRowKeyword] = useState('');
   const [rowOpen, setRowOpen] = useState(false);
   const [confirm, setConfirm] = useState<{ open: boolean; target: any }>({ open: false, target: null });
+  // 查看详情
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewDetail, setViewDetail] = useState<any>(null);
 
   const load = useCallback(async () => {
     try {
@@ -109,6 +112,68 @@ function PurchasePanel() {
     } catch (e: any) { showToast('导出失败', e.message, 'destructive'); }
   };
 
+  // 查看采购单详情
+  const viewPurchase = async (p: any) => {
+    try {
+      const d = await canteenApi.purchases.get(p.id);
+      setViewDetail(d); setViewOpen(true);
+    } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
+  };
+
+  // 打印预览
+  const printPurchase = async (p: any) => {
+    try {
+      const d = p.items ? p : await canteenApi.purchases.get(p.id);
+      const rows = (d.items || []).map((it: any, i: number) => `
+      <tr${i % 2 === 0 ? ' class="even"' : ''}>
+        <td>${i + 1}</td>
+        <td>${it.supply_name || ''}</td>
+        <td>${it.supply_spec || ''}</td>
+        <td>${it.unit || ''}</td>
+        <td class="num">${Number(it.unit_price).toFixed(2)}</td>
+        <td class="num">${Number(it.quantity).toFixed(2)}</td>
+        <td class="num">${Number(it.subtotal).toFixed(2)}</td>
+      </tr>`).join('');
+      const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>${d.order_no || '采购单'}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;padding:40px 50px;color:#333;font-size:14px}
+h1{font-size:24px;margin-bottom:6px}
+.meta{color:#666;font-size:13px;margin-bottom:20px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px}
+table{width:100%;border-collapse:collapse;margin-bottom:24px}
+th{background:#1e40af;color:#fff;padding:8px 6px;text-align:center;font-size:13px}
+td{padding:7px 6px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center}
+tr.even td{background:#f8fafc}
+.num{text-align:right;font-family:"Courier New",monospace}
+.total{font-size:18px;font-weight:bold;color:#dc2626;text-align:right;margin-bottom:6px}
+.pay{font-size:14px;font-weight:bold;text-align:right;margin-bottom:30px}
+@media print{body{padding:20px 30px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<h1>🍚 食堂采购单</h1>
+<div class="meta">
+  <span><strong>单号：</strong>${d.order_no || ''}</span>
+  <span><strong>日期：</strong>${d.purchase_date || ''}</span>
+  <span><strong>供应商：</strong>${d.supplier_name || '-'}</span>
+  <span><strong>渠道：</strong>${d.channel || '-'}</span>
+</div>
+<table><thead><tr>
+  <th style="width:40px">序号</th><th>品名</th><th>规格</th><th style="width:50px">单位</th>
+  <th style="width:80px">单价</th><th style="width:60px">数量</th><th style="width:90px">小计</th>
+</tr></thead><tbody>
+${rows}
+</tbody></table>
+<div class="total">合计：¥${Number(d.total_amount).toFixed(2)}</div>
+<div class="pay">实支：¥${Number(d.actual_pay || d.total_amount).toFixed(2)}</div>
+<script>setTimeout(()=>window.print(),300)</script>
+</body></html>`;
+      const w = window.open('', '_blank');
+      if (!w) { showToast('浏览器拦截了打印窗口', '', 'destructive'); return; }
+      w.document.write(html);
+      w.document.close();
+    } catch (e: any) { showToast('打印失败', e.message, 'destructive'); }
+  };
+
   const filteredSupplies = supplies.filter((s) => !form.items.some((i) => i.supply_id === s.id));
 
   return (
@@ -127,7 +192,7 @@ function PurchasePanel() {
               <TableHead className="w-12 text-center">序号</TableHead><TableHead>采购单号</TableHead>
               <TableHead className="w-28">日期</TableHead><TableHead>供应商</TableHead>
               <TableHead className="w-20">明细</TableHead><TableHead className="w-24">总金额</TableHead>
-              <TableHead className="w-24">实支</TableHead><TableHead className="w-[100px] text-center">操作</TableHead>
+              <TableHead className="w-24">实支</TableHead><TableHead className="w-[150px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -143,8 +208,10 @@ function PurchasePanel() {
                 <TableCell className="text-right font-medium">{fmt(p.total_amount)}</TableCell>
                 <TableCell className="text-right">{p.actual_pay ? fmt(p.actual_pay) : '-'}</TableCell>
                 <TableCell className="text-center">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => setConfirm({ open: true, target: p })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                  <Button variant="ghost" size="icon" title="查看" onClick={() => viewPurchase(p)}><Eye className="h-4 w-4 text-blue-600" /></Button>
+                  <Button variant="ghost" size="icon" title="打印预览" onClick={() => printPurchase(p)}><Printer className="h-4 w-4 text-green-600" /></Button>
+                  <Button variant="ghost" size="icon" title="编辑" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" title="删除" onClick={() => setConfirm({ open: true, target: p })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -222,6 +289,58 @@ function PurchasePanel() {
         </DialogContent>
       </Dialog>
 
+      {/* 查看详情弹窗 */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="sm:max-w-[640px] max-h-[85vh] flex flex-col">
+          <DialogHeader className="flex flex-row items-center justify-between pr-10">
+            <DialogTitle>采购单详情 {viewDetail?.order_no || ''}</DialogTitle>
+          </DialogHeader>
+          {viewDetail && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                <div><span className="text-muted-foreground text-xs">日期</span><div className="font-medium">{viewDetail.purchase_date}</div></div>
+                <div><span className="text-muted-foreground text-xs">供应商</span><div className="font-medium">{viewDetail.supplier_name || '-'}</div></div>
+                <div><span className="text-muted-foreground text-xs">渠道</span><div className="font-medium">{viewDetail.channel || '-'}</div></div>
+                <div><span className="text-muted-foreground text-xs">实支</span><div className="font-medium text-red-600">{viewDetail.actual_pay ? fmt(viewDetail.actual_pay) : '-'}</div></div>
+              </div>
+              {viewDetail.remark && <p className="text-xs text-muted-foreground"><span className="text-muted-foreground">备注：</span>{viewDetail.remark}</p>}
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12 text-center">序号</TableHead><TableHead>品名</TableHead>
+                      <TableHead className="w-20">单位</TableHead><TableHead className="w-24">数量</TableHead>
+                      <TableHead className="w-24">单价</TableHead><TableHead className="w-28">小计</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(viewDetail.items || []).length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="h-16 text-center text-muted-foreground">无明细</TableCell></TableRow>
+                    ) : viewDetail.items.map((it: any, idx: number) => (
+                      <TableRow key={idx}>
+                        <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
+                        <TableCell className="text-left">{it.supply_name || ''}</TableCell>
+                        <TableCell>{it.unit || ''}</TableCell>
+                        <TableCell className="text-right">{Number(it.quantity).toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{fmt(it.unit_price)}</TableCell>
+                        <TableCell className="text-right font-medium">{fmt(it.subtotal)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="text-sm">合计：<span className="font-bold text-red-600 text-base">{fmt(viewDetail.total_amount)}</span></div>
+                <div className="flex gap-2">
+                  <DialogClose asChild><Button variant="outline">关闭</Button></DialogClose>
+                  <Button onClick={() => printPurchase(viewDetail)}><Printer className="mr-1 h-4 w-4" />打印预览</Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={confirm.open} onOpenChange={(v) => setConfirm({ open: v, target: confirm.target })}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader><DialogTitle>确认操作</DialogTitle></DialogHeader>
@@ -244,7 +363,7 @@ function ExpensePanel() {
   const [summary, setSummary] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<any | null>(null);
-  const [form, setForm] = useState({ expense_date: new Date().toISOString().slice(0, 10), category: '', amount: 0, remark: '' });
+  const [form, setForm] = useState({ expense_month: new Date().toISOString().slice(0, 7), category: '', amount: 0, remark: '' });
   const [confirm, setConfirm] = useState<{ open: boolean; target: any }>({ open: false, target: null });
 
   const load = useCallback(async () => {
@@ -261,11 +380,13 @@ function ExpensePanel() {
   const total = Object.values(summary).reduce((a, b) => a + b, 0);
 
   const save = async () => {
-    if (!form.expense_date || !form.category) { showToast('校验失败', '日期和科目不能为空', 'destructive'); return; }
+    if (!form.expense_month || !form.category) { showToast('校验失败', '月份和科目不能为空', 'destructive'); return; }
     try {
-      if (edit) { await canteenApi.expenses.update(edit.id, form); showToast('✅ 已更新'); }
-      else { await canteenApi.expenses.create(form); showToast('✅ 已保存'); }
-      setOpen(false); load();
+      // 按月存储：统一存为当月 1 日，查询按 substr(expense_date,1,7) 匹配
+      const payload = { expense_date: `${form.expense_month}-01`, category: form.category, amount: form.amount, remark: form.remark };
+      if (edit) { await canteenApi.expenses.update(edit.id, payload); showToast('✅ 已更新'); }
+      else { await canteenApi.expenses.create(payload); showToast('✅ 已保存'); }
+      setOpen(false); setMonth(form.expense_month); load();
     } catch (e: any) { showToast('保存失败', e.message, 'destructive'); }
   };
   const del = async () => {
@@ -282,7 +403,7 @@ function ExpensePanel() {
           <h3 className="text-sm font-semibold">其他费用（水电气、人工费）</h3>
           <div className="flex gap-2 items-center">
             <Input type="month" className="h-8 w-36" value={month} onChange={(e) => setMonth(e.target.value)} />
-            <Button size="sm" onClick={() => { setEdit(null); setForm({ expense_date: `${month}-01`, category: cats[0]?.name || '', amount: 0, remark: '' }); setOpen(true); }}>
+            <Button size="sm" onClick={() => { setEdit(null); setForm({ expense_month: month, category: cats[0]?.name || '', amount: 0, remark: '' }); setOpen(true); }}>
               <Plus className="mr-1 h-4 w-4" />新增
             </Button>
           </div>
@@ -299,7 +420,7 @@ function ExpensePanel() {
         <Table className="max-h-[45vh]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28">日期</TableHead>
+              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28">月份</TableHead>
               <TableHead className="w-28">科目</TableHead><TableHead className="w-24">金额</TableHead>
               <TableHead>备注</TableHead><TableHead className="w-[100px] text-center">操作</TableHead>
             </TableRow>
@@ -310,12 +431,12 @@ function ExpensePanel() {
             ) : list.map((e) => (
               <TableRow key={e.id}>
                 <TableCell className="text-center text-muted-foreground">{e.id}</TableCell>
-                <TableCell>{e.expense_date}</TableCell>
+                <TableCell>{(e.expense_date || '').slice(0, 7)}</TableCell>
                 <TableCell>{e.category}</TableCell>
                 <TableCell className="text-right font-medium">{fmt(e.amount)}</TableCell>
                 <TableCell className="text-left max-w-[200px] truncate">{e.remark || '-'}</TableCell>
                 <TableCell className="text-center">
-                  <Button variant="ghost" size="icon" onClick={() => { setEdit(e); setForm({ expense_date: e.expense_date, category: e.category, amount: e.amount, remark: e.remark || '' }); setOpen(true); }}>
+                  <Button variant="ghost" size="icon" onClick={() => { setEdit(e); setForm({ expense_month: (e.expense_date || '').slice(0, 7), category: e.category, amount: e.amount, remark: e.remark || '' }); setOpen(true); }}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => setConfirm({ open: true, target: e })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
@@ -330,7 +451,7 @@ function ExpensePanel() {
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader><DialogTitle>{edit ? '编辑费用' : '新增费用'}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            <Input type="date" value={form.expense_date} onChange={(e) => setForm({ ...form, expense_date: e.target.value })} />
+            <Input type="month" value={form.expense_month} onChange={(e) => setForm({ ...form, expense_month: e.target.value })} />
             <select className="w-full h-9 rounded-md border px-2 text-sm" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
               <option value="">选择科目</option>
               {cats.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
