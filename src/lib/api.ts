@@ -189,4 +189,17 @@ export const canteenApi = {
     monthlyCompare: (params?: any) => req<ApiResponse>(C + '/analytics/monthly-compare' + qs(params || {})),
     suggestions: (month?: string) => req<ApiResponse>(C + '/analytics/suggestions' + qs({ month })),
   },
+  // 饭卡充值
+  recharges: {
+    list: (params?: any) => req<PaginatedResult<any>>(C + '/recharges' + qs(params || {})),
+    summary: (month?: string) => req<ApiResponse>(C + '/recharges/summary' + qs({ month })),
+    delete: (id: number) => req<ApiResponse>(C + '/recharges/' + id, { method: 'DELETE' }),
+    importCsv: (file: File, mode: string, mapping: Record<string, string>) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('mode', mode);
+      fd.append('mapping', JSON.stringify(mapping));
+      return fetch(C + '/recharges/import', { method: 'POST', body: fd }).then((r) => r.json());
+    },
+  },
 };

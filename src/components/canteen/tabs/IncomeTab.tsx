@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { showToast } from '@/components/ui/toaster';
 import { canteenApi } from '@/lib/api';
-import { Plus, Pencil, Trash2, Printer, Upload, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Printer, Upload, X, Eye } from 'lucide-react';
 
 const fmt = (n: any) => `¥${Number(n || 0).toFixed(2)}`;
 
@@ -187,6 +187,45 @@ function IncomePanel() {
     finally { setImporting(false); }
   };
 
+  // ===== 查看/打印 =====
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewItem, setViewItem] = useState<any>(null);
+
+  const viewIncome = (d: any) => { setViewItem(d); setViewOpen(true); };
+
+  const printIncome = (d: any) => {
+    const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>食堂每日收入 ${d.income_date}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;padding:40px 50px;color:#333;font-size:14px}
+h1{font-size:24px;margin-bottom:6px}
+.meta{color:#666;font-size:13px;margin-bottom:20px;display:flex;justify-content:space-between}
+table{width:100%;border-collapse:collapse;margin-bottom:24px}
+th{background:#1e40af;color:#fff;padding:8px 6px;text-align:center;font-size:13px}
+td{padding:8px 6px;border-bottom:1px solid #e5e7eb;font-size:14px;text-align:center}
+tr.even td{background:#f8fafc}
+.num{text-align:right;font-family:"Courier New",monospace}
+.total{font-size:18px;font-weight:bold;color:#dc2626;text-align:right}
+@media print{body{padding:20px 30px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<h1>🍚 食堂每日收入统计</h1>
+<div class="meta"><span><strong>日期：</strong>${d.income_date}</span><span><strong>打印时间：</strong>${new Date().toLocaleString('zh-CN')}</span></div>
+<table><thead><tr><th>餐别</th><th>次数</th><th>金额</th></tr></thead><tbody>
+<tr><td>早餐</td><td>${d.breakfast_count}</td><td class="num">¥${Number(d.breakfast_amount).toFixed(2)}</td></tr>
+<tr class="even"><td>午餐</td><td>${d.lunch_count}</td><td class="num">¥${Number(d.lunch_amount).toFixed(2)}</td></tr>
+<tr><td>晚餐</td><td>${d.dinner_count}</td><td class="num">¥${Number(d.dinner_amount).toFixed(2)}</td></tr>
+</tbody></table>
+<div class="total">总人次：${d.total_count}　总收入：¥${Number(d.total_amount).toFixed(2)}</div>
+${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.remark}</p>` : ''}
+<script>setTimeout(()=>window.print(),300)</script>
+</body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { showToast('浏览器拦截了打印窗口', '', 'destructive'); return; }
+    w.document.write(html);
+    w.document.close();
+  };
+
   return (
     <Card>
       <CardContent className="p-4 space-y-3">
@@ -218,7 +257,7 @@ function IncomePanel() {
               <TableHead className="w-20">午餐(次)</TableHead><TableHead className="w-24">午餐(元)</TableHead>
               <TableHead className="w-20">晚餐(次)</TableHead><TableHead className="w-24">晚餐(元)</TableHead>
               <TableHead className="w-24">总人次</TableHead><TableHead className="w-24">总收入</TableHead>
-              <TableHead className="w-[100px] text-center">操作</TableHead>
+              <TableHead className="w-[150px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -237,8 +276,10 @@ function IncomePanel() {
                 <TableCell className="text-center">{d.total_count}</TableCell>
                 <TableCell className="text-right font-medium text-red-600">{fmt(d.total_amount)}</TableCell>
                 <TableCell className="text-center">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => setConfirm({ open: true, target: d })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                  <Button variant="ghost" size="icon" title="查看" onClick={() => viewIncome(d)}><Eye className="h-4 w-4 text-blue-600" /></Button>
+                  <Button variant="ghost" size="icon" title="打印预览" onClick={() => printIncome(d)}><Printer className="h-4 w-4 text-green-600" /></Button>
+                  <Button variant="ghost" size="icon" title="编辑" onClick={() => openEdit(d)}><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" title="删除" onClick={() => setConfirm({ open: true, target: d })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -331,6 +372,37 @@ function IncomePanel() {
             <DialogClose asChild><Button variant="outline">取消</Button></DialogClose>
             <Button onClick={doImport} disabled={!parsed || importing}>{importing ? '导入中…' : '确认导入'}</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 收入详情弹窗 */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader><DialogTitle>收入详情 {viewItem?.income_date || ''}</DialogTitle></DialogHeader>
+          {viewItem && (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>餐别</TableHead><TableHead>次数</TableHead><TableHead>金额</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow><TableCell>早餐</TableCell><TableCell>{viewItem.breakfast_count}</TableCell><TableCell className="text-right">{fmt(viewItem.breakfast_amount)}</TableCell></TableRow>
+                  <TableRow><TableCell>午餐</TableCell><TableCell>{viewItem.lunch_count}</TableCell><TableCell className="text-right">{fmt(viewItem.lunch_amount)}</TableCell></TableRow>
+                  <TableRow><TableCell>晚餐</TableCell><TableCell>{viewItem.dinner_count}</TableCell><TableCell className="text-right">{fmt(viewItem.dinner_amount)}</TableCell></TableRow>
+                </TableBody>
+              </Table>
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="text-sm">总人次 <b>{viewItem.total_count}</b>　总收入 <b className="text-red-600">{fmt(viewItem.total_amount)}</b></div>
+                <div className="flex gap-2">
+                  <DialogClose asChild><Button variant="outline">关闭</Button></DialogClose>
+                  <Button onClick={() => printIncome(viewItem)}><Printer className="mr-1 h-4 w-4" />打印预览</Button>
+                </div>
+              </div>
+              {viewItem.remark && <p className="text-xs text-muted-foreground mt-1">备注：{viewItem.remark}</p>}
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -526,14 +598,308 @@ tr.even td{background:#f8fafc}
   );
 }
 
+// ---------- 饭卡充值 ----------
+const RECHARGE_FIELDS: { key: string; label: string; required?: boolean; hint?: string }[] = [
+  { key: 'external_sn', label: '外部编号', required: true, hint: '卡流水号' },
+  { key: 'user_name', label: '姓名', required: true },
+  { key: 'user_id', label: '工号' },
+  { key: 'user_department', label: '部门名称' },
+  { key: 'department_code', label: '部门编号' },
+  { key: 'recharge_date', label: '充值日期', required: true, hint: '自动取日期部分' },
+  { key: 'amount', label: '充值金额', required: true, hint: '自动去除￥' },
+  { key: 'payment_method', label: '支付方式', hint: '默认现金' },
+  { key: 'operator', label: '操作员', hint: '默认导入' },
+  { key: 'card_no', label: '卡号' },
+  { key: 'balance_recorded', label: '卡余额' },
+  { key: 'machine_no', label: '机号' },
+  { key: 'bill_no', label: '账单号' },
+  { key: 'remark', label: '备注' },
+];
+
+function RechargePanel() {
+  const [list, setList] = useState<any[]>([]);
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [keyword, setKeyword] = useState('');
+  const [summary, setSummary] = useState<any>({ total: 0, count: 0, people: 0 });
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 20;
+  const [confirm, setConfirm] = useState<{ open: boolean; target: any }>({ open: false, target: null });
+
+  // 导入
+  const [importOpen, setImportOpen] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvPreview, setCsvPreview] = useState<string[][]>([]);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [mode, setMode] = useState<'upsert' | 'skip'>('upsert');
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [r, s] = await Promise.all([
+        canteenApi.recharges.list({ month, keyword, page, limit }),
+        canteenApi.recharges.summary(month),
+      ]);
+      setList(r.items); setTotal(r.total); setSummary(s);
+    } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
+  }, [month, keyword, page]);
+  useEffect(() => { load(); }, [load]);
+
+  const del = async () => {
+    if (!confirm.target) return;
+    try { await canteenApi.recharges.delete(confirm.target.id); showToast('✅ 已删除'); load(); }
+    catch (e: any) { showToast('删除失败', e.message, 'destructive'); }
+    finally { setConfirm({ open: false, target: null }); }
+  };
+
+  // 解析 CSV 头部 + 预览（GBK/UTF-8）
+  const handleFile = async (f: File | undefined | null) => {
+    if (!f) return;
+    setFileName(f.name); setResult(null);
+    try {
+      const buf = await f.arrayBuffer();
+      let text = '';
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+      catch { try { text = new TextDecoder('gbk').decode(buf); } catch { text = new TextDecoder('utf-8', { fatal: false }).decode(buf); } }
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length < 2) { showToast('解析失败', 'CSV 数据不足', 'destructive'); return; }
+      const parseLine = (line: string): string[] => {
+        const out: string[] = []; let cur = ''; let inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+          else if (ch === ',' && !inQ) { out.push(cur); cur = ''; }
+          else cur += ch;
+        }
+        out.push(cur);
+        return out.map((s) => s.trim().replace(/^"|"$/g, ''));
+      };
+      const header = parseLine(lines[0]);
+      const preview = lines.slice(1, 6).map(parseLine);
+      setCsvHeaders(header);
+      setCsvPreview(preview);
+      // 智能匹配映射
+      const norm = (h: string) => h.replace(/[|｜]/g, '').replace(/\s+/g, '').toLowerCase();
+      const headerNorm = header.map(norm);
+      const auto = (targets: string[]) => {
+        for (const t of targets) {
+          const idx = headerNorm.findIndex((h) => h.includes(t));
+          if (idx >= 0) return header[idx];
+        }
+        return '';
+      };
+      setMapping({
+        external_sn: auto(['卡流水号', '流水号', 'externalsn']),
+        user_name: auto(['姓名', '用户名', 'username']),
+        user_id: auto(['工号', 'userid']),
+        user_department: auto(['部门名称', '部门', 'department']),
+        department_code: auto(['部门编号', 'departmentcode']),
+        recharge_date: auto(['充值时间', '充值日期', '时间', 'rechargedate']),
+        amount: auto(['充值金额', '金额', 'amount']),
+        payment_method: auto(['类型', '支付方式', 'paymentmethod']),
+        operator: auto(['操作员', 'operator']),
+        card_no: auto(['卡号', 'cardno']),
+        balance_recorded: auto(['卡余额', '余额', 'balance']),
+        machine_no: auto(['机号', 'machineno']),
+        bill_no: auto(['账单号', 'billno']),
+        remark: '',
+      });
+    } catch (e: any) { showToast('读取失败', e.message, 'destructive'); }
+  };
+
+  const doImport = async () => {
+    if (!fileRef.current?.files?.[0]) { showToast('请选择文件', '', 'destructive'); return; }
+    setImporting(true);
+    try {
+      const r = await canteenApi.recharges.importCsv(fileRef.current.files[0], mode, mapping);
+      if (r.ok && r.data) setResult(r.data);
+      else showToast('导入失败', r.error || '未知错误', 'destructive');
+      load();
+    } catch (e: any) { showToast('导入失败', e.message, 'destructive'); }
+    finally { setImporting(false); }
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">饭卡充值记录</h3>
+          <div className="flex gap-2 items-center">
+            <Input type="month" className="h-8 w-36" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <Input className="h-8 w-36" placeholder="搜索姓名/工号/卡号" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(1); }} />
+            <Button size="sm" variant="outline" onClick={() => { setFileName(''); setCsvHeaders([]); setCsvPreview([]); setResult(null); setImportOpen(true); }}>
+              <Upload className="mr-1 h-4 w-4" />导入CSV
+            </Button>
+          </div>
+        </div>
+        {(summary.count > 0 || list.length > 0) && (
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="bg-blue-50 text-blue-700 rounded px-2 py-1">月充值 <b>{fmt(summary.total)}</b></span>
+            <span className="bg-slate-100 rounded px-2 py-1">{summary.count} 笔</span>
+            <span className="bg-slate-100 rounded px-2 py-1">{summary.people} 人</span>
+          </div>
+        )}
+        <Table className="max-h-[45vh]">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12 text-center">序号</TableHead><TableHead>姓名</TableHead>
+              <TableHead className="w-24">工号</TableHead><TableHead className="w-24">卡号</TableHead>
+              <TableHead className="w-20">流水号</TableHead><TableHead className="w-28">充值日期</TableHead>
+              <TableHead className="w-24">金额</TableHead><TableHead className="w-24">余额</TableHead>
+              <TableHead className="w-24">方式</TableHead><TableHead className="w-20">操作员</TableHead>
+              <TableHead className="w-20">部门</TableHead><TableHead className="w-[80px] text-center">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.length === 0 ? (
+              <TableRow><TableCell colSpan={12} className="h-16 text-center text-muted-foreground">暂无充值记录，点击「导入CSV」批量导入</TableCell></TableRow>
+            ) : list.map((r, idx) => (
+              <TableRow key={r.id}>
+                <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
+                <TableCell className="font-medium">{r.user_name}</TableCell>
+                <TableCell>{r.user_id || '-'}</TableCell>
+                <TableCell>{r.card_no || '-'}</TableCell>
+                <TableCell>{r.external_sn || '-'}</TableCell>
+                <TableCell>{r.recharge_date || '-'}</TableCell>
+                <TableCell className="text-right font-medium text-green-600">{fmt(r.amount)}</TableCell>
+                <TableCell className="text-right">{r.balance_recorded != null ? fmt(r.balance_recorded) : '-'}</TableCell>
+                <TableCell>{r.payment_method || '现金'}</TableCell>
+                <TableCell>{r.operator || '-'}</TableCell>
+                <TableCell className="max-w-[80px] truncate">{r.user_department || '-'}</TableCell>
+                <TableCell className="text-center">
+                  <Button variant="ghost" size="icon" onClick={() => setConfirm({ open: true, target: r })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {total > limit && (
+          <div className="flex justify-center gap-2">
+            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
+            <span className="text-xs text-muted-foreground self-center">{page} / {Math.ceil(total / limit)}</span>
+            <Button size="sm" variant="outline" disabled={page >= Math.ceil(total / limit)} onClick={() => setPage(page + 1)}>下一页</Button>
+          </div>
+        )}
+      </CardContent>
+
+      {/* 导入弹窗 */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="sm:max-w-[680px] max-h-[85vh] flex flex-col">
+          <DialogHeader><DialogTitle>导入饭卡充值 CSV</DialogTitle></DialogHeader>
+          <div className="space-y-3 overflow-y-auto pr-1">
+            <div className="flex items-center gap-2">
+              <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload className="mr-1 h-4 w-4" />选择 CSV 文件</Button>
+              {fileName && <span className="text-xs text-muted-foreground">{fileName}</span>}
+            </div>
+
+            {csvHeaders.length > 0 && (
+              <>
+                {/* 数据预览 */}
+                <div className="rounded-md border overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-slate-100">
+                        {csvHeaders.map((h, i) => <th key={i} className="px-2 py-1 whitespace-nowrap text-left">{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvPreview.map((row, i) => (
+                        <tr key={i} className="border-t">
+                          {csvHeaders.map((_, j) => <td key={j} className="px-2 py-1 whitespace-nowrap">{row[j] || ''}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 字段映射 */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">字段映射（自动匹配，可调整）</p>
+                  {RECHARGE_FIELDS.map((fld) => (
+                    <div key={fld.key} className="flex items-center gap-2 text-sm">
+                      <span className={`w-24 shrink-0 ${fld.required ? 'text-red-600 font-medium' : 'text-slate-600'}`}>
+                        {fld.label}{fld.required ? ' *' : ''}
+                      </span>
+                      <select className="flex-1 h-8 rounded-md border px-2 text-sm" value={mapping[fld.key] || ''}
+                        onChange={(e) => setMapping({ ...mapping, [fld.key]: e.target.value })}>
+                        <option value="">不导入</option>
+                        {csvHeaders.map((h) => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                      {fld.hint && <span className="text-[11px] text-muted-foreground shrink-0">{fld.hint}</span>}
+                    </div>
+                  ))}
+                </div>
+
+                {/* 导入模式 */}
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="text-muted-foreground">导入模式：</span>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input type="radio" checked={mode === 'upsert'} onChange={() => setMode('upsert')} /> 更新导入（存在则更新）
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input type="radio" checked={mode === 'skip'} onChange={() => setMode('skip')} /> 仅新增（重复跳过）
+                  </label>
+                </div>
+              </>
+            )}
+
+            {/* 导入结果 */}
+            {result && (
+              <div className="rounded-md border bg-slate-50 p-3 text-sm space-y-1">
+                <p className="font-medium">导入结果</p>
+                <div className="grid grid-cols-2 gap-x-4 text-xs">
+                  <span>总行数：{result.total}</span>
+                  <span className="text-green-600">新增：{result.inserted}</span>
+                  <span className="text-blue-600">更新：{result.updated}</span>
+                  <span className="text-amber-600">跳过：{result.skipped}</span>
+                </div>
+                {result.errors?.length > 0 && (
+                  <div className="mt-1">
+                    <p className="text-red-600 text-xs">失败 {result.errors.length} 行：</p>
+                    <div className="max-h-28 overflow-y-auto space-y-0.5">
+                      {result.errors.map((e: any, i: number) => <p key={i} className="text-[11px] text-red-500">第 {e.row} 行：{e.reason}</p>)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <DialogClose asChild><Button variant="outline">关闭</Button></DialogClose>
+            <Button onClick={doImport} disabled={!fileName || importing}>{importing ? '导入中…' : '开始导入'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirm.open} onOpenChange={(v) => setConfirm({ open: v, target: confirm.target })}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader><DialogTitle>确认操作</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">删除 {confirm.target?.user_name || ''} 的充值记录（{confirm.target?.external_sn || ''}）？</p>
+          <div className="flex justify-end gap-2">
+            <DialogClose asChild><Button variant="outline">取消</Button></DialogClose>
+            <Button variant="destructive" onClick={del}>确认删除</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 export default function IncomeTab() {
   return (
     <Tabs defaultValue="income">
       <TabsList className="bg-slate-100 p-1 rounded-lg">
         <TabsTrigger value="income">每日收入</TabsTrigger>
+        <TabsTrigger value="recharge">饭卡充值</TabsTrigger>
         <TabsTrigger value="resource">资源占用费</TabsTrigger>
       </TabsList>
       <TabsContent value="income"><IncomePanel /></TabsContent>
+      <TabsContent value="recharge"><RechargePanel /></TabsContent>
       <TabsContent value="resource"><ResourceFeePanel /></TabsContent>
     </Tabs>
   );

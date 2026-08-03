@@ -6,15 +6,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { showToast } from '@/components/ui/toaster';
-import { canteenApi } from '@/lib/api';
+import { canteenApi, suppliersApi } from '@/lib/api';
 import { Plus, Pencil, Trash2, X, Download, Save, Eye, Printer } from 'lucide-react';
 
 const fmt = (n: any) => `¥${Number(n || 0).toFixed(2)}`;
+// 采购渠道选项
+const CHANNELS = ['电商平台', '个体经营', '自购'];
 
 // ---------- 食材采购录入 ----------
 function PurchasePanel() {
   const [list, setList] = useState<any[]>([]);
   const [supplies, setSupplies] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -25,7 +28,7 @@ function PurchasePanel() {
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState({
     purchase_date: new Date().toISOString().slice(0, 10),
-    supplier_name: '', channel: '', actual_pay: 0, remark: '',
+    supplier_id: null as number | null, supplier_name: '', channel: '', actual_pay: 0, remark: '',
     items: [] as any[],
   });
   // 行内添加食材
@@ -49,24 +52,31 @@ function PurchasePanel() {
     catch { /* ignore */ }
   }, []);
 
+  const loadSuppliers = useCallback(async () => {
+    try {
+      const r = await suppliersApi.list();
+      setSuppliers(r.items || []);
+    } catch { /* ignore */ }
+  }, []);
+
   const openNew = () => {
     setEditId(null);
-    setForm({ purchase_date: new Date().toISOString().slice(0, 10), supplier_name: '', channel: '', actual_pay: 0, remark: '', items: [] });
-    setOpen(true); loadSupplies();
+    setForm({ purchase_date: new Date().toISOString().slice(0, 10), supplier_id: null, supplier_name: '', channel: CHANNELS[0], actual_pay: 0, remark: '', items: [] });
+    setOpen(true); loadSupplies(); loadSuppliers();
   };
   const openEdit = async (p: any) => {
     setEditId(p.id);
     try {
       const d = await canteenApi.purchases.get(p.id);
       setForm({
-        purchase_date: d.purchase_date, supplier_name: d.supplier_name || '', channel: d.channel || '',
+        purchase_date: d.purchase_date, supplier_id: d.supplier_id || null, supplier_name: d.supplier_name || '', channel: d.channel || CHANNELS[0],
         actual_pay: d.actual_pay || 0, remark: d.remark || '',
         items: (d.items || []).map((i: any) => ({
           supply_id: i.supply_id, supply_name: i.supply_name, unit: i.unit,
           quantity: i.quantity, unit_price: i.unit_price, subtotal: i.subtotal,
         })),
       });
-      setOpen(true); loadSupplies();
+      setOpen(true); loadSupplies(); loadSuppliers();
     } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
   };
 
@@ -90,8 +100,11 @@ function PurchasePanel() {
   const save = async () => {
     if (!form.items.length) { showToast('校验失败', '请至少添加一行采购明细', 'destructive'); return; }
     try {
-      if (editId) { await canteenApi.purchases.update(editId, { ...form }); showToast('✅ 已更新'); }
-      else { await canteenApi.purchases.create({ ...form }); showToast('✅ 已保存'); }
+      // 根据选中的供应商自动填 supplier_name（兼容下拉选择）
+      const sel = suppliers.find((s) => s.id === form.supplier_id);
+      const payload = { ...form, supplier_name: sel ? sel.name : form.supplier_name };
+      if (editId) { await canteenApi.purchases.update(editId, payload); showToast('✅ 已更新'); }
+      else { await canteenApi.purchases.create(payload); showToast('✅ 已保存'); }
       setOpen(false); load();
     } catch (e: any) { showToast('保存失败', e.message, 'destructive'); }
   };
@@ -232,8 +245,15 @@ ${rows}
           <DialogHeader><DialogTitle>{editId ? `编辑采购单 #${editId}` : '新建采购单'}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <Input type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} />
-            <Input placeholder="供应商" value={form.supplier_name} onChange={(e) => setForm({ ...form, supplier_name: e.target.value })} />
-            <Input placeholder="采购渠道" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })} />
+            {/* 供应商下拉（系统供应商列表） */}
+            <select className="h-9 rounded-md border px-2 text-sm" value={form.supplier_id ?? ''} onChange={(e) => setForm({ ...form, supplier_id: e.target.value ? Number(e.target.value) : null, supplier_name: e.target.options[e.target.selectedIndex]?.text || '' })}>
+              <option value="">选择供应商</option>
+              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            {/* 采购渠道选择框 */}
+            <select className="h-9 rounded-md border px-2 text-sm" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })}>
+              {CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
             <Input type="number" placeholder="实支金额" value={form.actual_pay || ''} onChange={(e) => setForm({ ...form, actual_pay: parseFloat(e.target.value) || 0 })} />
           </div>
           <div className="relative">
