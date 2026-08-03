@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,12 +7,87 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { showToast } from '@/components/ui/toaster';
 import { canteenApi } from '@/lib/api';
-import { Plus, Pencil, Trash2, Printer } from 'lucide-react';
+import { Plus, Pencil, Trash2, Printer, Upload, X } from 'lucide-react';
 
 const fmt = (n: any) => `¥${Number(n || 0).toFixed(2)}`;
 
 // 资源占用费收取缘由
 const FEE_REASONS = ['已报餐但未用餐', '未报餐而用餐', '未报餐未刷卡'];
+
+// ---------- CSV 解析（刷卡机个人餐别统计）----------
+// 表头示例：工号,姓名,卡号,部门编号,部门名称,早餐|次数,早餐|金额,中餐|次数,中餐|金额,晚餐|次数,晚餐|金额,餐外消费|次数,餐外消费|金额,合计次数,合计金额
+// 数据行：每人一行；末行"汇总:"跳过
+function parseMealCsv(text: string): { breakfast_count: number; breakfast_amount: number; lunch_count: number; lunch_amount: number; dinner_count: number; dinner_amount: number; people: number } | null {
+  // 简单 CSV 解析（支持双引号包裹、逗号分隔）
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return null;
+  const parseLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (ch === ',' && !inQ) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map((s) => s.trim().replace(/^"|"$/g, ''));
+  };
+
+  const header = parseLine(lines[0]).map((h) => h.toLowerCase());
+  // 按表头名识别列（兼容 早餐|次数 / 早餐次数 / 早餐 次数 等）
+  const findCol = (meal: string, type: '次数' | '金额'): number => {
+    const idx = header.findIndex((h) => h.includes(meal) && h.includes(type));
+    return idx;
+  };
+  const bCnt = findCol('早餐', '次数'), bAmt = findCol('早餐', '金额');
+  const lCnt = findCol('中餐', '次数'), lAmt = findCol('中餐', '金额');
+  const dCnt = findCol('晚餐', '次数'), dAmt = findCol('晚餐', '金额');
+  if (bCnt < 0 || lCnt < 0 || dCnt < 0) return null;
+
+  const num = (v: string): number => {
+    const n = parseFloat(String(v || '').replace(/[￥¥,\s]/g, ''));
+    return isNaN(n) ? 0 : n;
+  };
+
+  let breakfast_count = 0, breakfast_amount = 0;
+  let lunch_count = 0, lunch_amount = 0;
+  let dinner_count = 0, dinner_amount = 0;
+  let people = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseLine(lines[i]);
+    const first = cols[0] || '';
+    // 跳过汇总/合计行
+    if (/汇总|合计|总计|小计/.test(first)) continue;
+    if (!/^\d/.test(first)) continue;
+    people++;
+    breakfast_count += num(cols[bCnt]);
+    breakfast_amount += num(cols[bAmt]);
+    lunch_count += num(cols[lCnt]);
+    lunch_amount += num(cols[lAmt]);
+    dinner_count += num(cols[dCnt]);
+    dinner_amount += num(cols[dAmt]);
+  }
+  if (people === 0) return null;
+  return { breakfast_count, breakfast_amount, lunch_count, lunch_amount, dinner_count, dinner_amount, people };
+}
+
+async function readCsvFile(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  // 优先 UTF-8，若出现替换字符则尝试 GBK（刷卡机导出常见 GBK）
+  try {
+    const utf8 = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+    return utf8;
+  } catch {
+    try {
+      return new TextDecoder('gbk').decode(buf);
+    } catch {
+      return new TextDecoder('utf-8', { fatal: false }).decode(buf);
+    }
+  }
+}
 
 // ---------- 每日收入 ----------
 function IncomePanel() {
@@ -75,6 +150,43 @@ function IncomePanel() {
     finally { setConfirm({ open: false, target: null }); }
   };
 
+  // ===== CSV 导入 =====
+  const [importOpen, setImportOpen] = useState(false);
+  const [importDate, setImportDate] = useState(new Date().toISOString().slice(0, 10));
+  const [fileName, setFileName] = useState('');
+  const [parsed, setParsed] = useState<any>(null);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (f: File | undefined | null) => {
+    if (!f) return;
+    setFileName(f.name); setParsed(null);
+    try {
+      const text = await readCsvFile(f);
+      const r = parseMealCsv(text);
+      if (!r) { showToast('解析失败', '未识别到早餐/中餐/晚餐列，请确认是餐别统计导出文件', 'destructive'); return; }
+      setParsed(r);
+    } catch (e: any) { showToast('读取失败', e.message, 'destructive'); }
+  };
+
+  const doImport = async () => {
+    if (!parsed || !importDate) return;
+    setImporting(true);
+    try {
+      await canteenApi.income.save({
+        income_date: importDate,
+        breakfast_count: parsed.breakfast_count, breakfast_amount: parsed.breakfast_amount,
+        lunch_count: parsed.lunch_count, lunch_amount: parsed.lunch_amount,
+        dinner_count: parsed.dinner_count, dinner_amount: parsed.dinner_amount,
+        remark: `CSV导入(${fileName})`,
+      });
+      showToast(`✅ 已导入 ${parsed.people} 人数据到 ${importDate}`);
+      setImportOpen(false); setParsed(null); setFileName('');
+      setMonth(importDate.slice(0, 7)); load();
+    } catch (e: any) { showToast('导入失败', e.message, 'destructive'); }
+    finally { setImporting(false); }
+  };
+
   return (
     <Card>
       <CardContent className="p-4 space-y-3">
@@ -82,6 +194,9 @@ function IncomePanel() {
           <h3 className="text-sm font-semibold">每日刷卡收入</h3>
           <div className="flex gap-2 items-center">
             <Input type="month" className="h-8 w-36" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <Button size="sm" variant="outline" onClick={() => { setImportDate(new Date().toISOString().slice(0, 10)); setFileName(''); setParsed(null); setImportOpen(true); }}>
+              <Upload className="mr-1 h-4 w-4" />导入
+            </Button>
             <Button size="sm" onClick={openNew}><Plus className="mr-1 h-4 w-4" />新增</Button>
           </div>
         </div>
@@ -171,6 +286,50 @@ function IncomePanel() {
           <div className="flex justify-end gap-2">
             <DialogClose asChild><Button variant="outline">取消</Button></DialogClose>
             <Button onClick={save}>保存</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV 导入弹窗 */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader><DialogTitle>导入餐别统计</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">统计日期（该日期的早/中/晚收入）</label>
+              <Input type="date" value={importDate} onChange={(e) => setImportDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">选择刷卡机导出的「个人餐别统计」CSV 文件（支持 GBK/UTF-8）</label>
+              <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+                  <Upload className="mr-1 h-4 w-4" />选择文件
+                </Button>
+                {fileName && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    {fileName}
+                    <button className="text-red-500 hover:text-red-700" onClick={() => { setFileName(''); setParsed(null); }}><X className="h-3 w-3" /></button>
+                  </span>
+                )}
+              </div>
+            </div>
+            {parsed && (
+              <div className="rounded-md border bg-slate-50 p-3 space-y-1.5 text-sm">
+                <p className="font-medium">解析结果：{parsed.people} 人</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <span>早餐：{parsed.breakfast_count} 次 / {fmt(parsed.breakfast_amount)}</span>
+                  <span>午餐：{parsed.lunch_count} 次 / {fmt(parsed.lunch_amount)}</span>
+                  <span>晚餐：{parsed.dinner_count} 次 / {fmt(parsed.dinner_amount)}</span>
+                  <span className="text-blue-700 font-medium">总人次 {parsed.breakfast_count + parsed.lunch_count + parsed.dinner_count} / 总额 {fmt(parsed.breakfast_amount + parsed.lunch_amount + parsed.dinner_amount)}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">将写入 {importDate}（如该日期已有数据将被覆盖）</p>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <DialogClose asChild><Button variant="outline">取消</Button></DialogClose>
+            <Button onClick={doImport} disabled={!parsed || importing}>{importing ? '导入中…' : '确认导入'}</Button>
           </div>
         </DialogContent>
       </Dialog>
