@@ -278,7 +278,7 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
                 <TableCell className="text-right font-medium text-red-600">{fmt(d.total_amount)}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" title="查看" onClick={() => viewIncome(d)}><Eye className="h-4 w-4 text-blue-600" /></Button>
-                  <Button variant="ghost" size="icon" title="打印预览" onClick={() => printIncome(d)}><Printer className="h-4 w-4 text-green-600" /></Button>
+                  <Button variant="ghost" size="icon" title="打印" onClick={() => printIncome(d)}><Printer className="h-4 w-4 text-green-600" /></Button>
                   <Button variant="ghost" size="icon" title="编辑" onClick={() => openEdit(d)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" title="删除" onClick={() => setConfirm({ open: true, target: d })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                 </TableCell>
@@ -398,7 +398,7 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
                 <div className="text-sm">总人次 <b>{(viewItem.lunch_count || 0) + (viewItem.dinner_count || 0)}</b>　总收入 <b className="text-red-600">{fmt(viewItem.total_amount)}</b></div>
                 <div className="flex gap-2">
                   <DialogClose asChild><Button variant="outline">关闭</Button></DialogClose>
-                  <Button onClick={() => printIncome(viewItem)}><Printer className="mr-1 h-4 w-4" />打印预览</Button>
+                  <Button onClick={() => printIncome(viewItem)}><Printer className="mr-1 h-4 w-4" />打印</Button>
                 </div>
               </div>
               {viewItem.remark && <p className="text-xs text-muted-foreground mt-1">备注：{viewItem.remark}</p>}
@@ -515,9 +515,6 @@ tr.even td{background:#f8fafc}
         </div>
         {summary.summary.length > 0 && (
           <div className="flex flex-wrap gap-2 text-xs">
-            {summary.summary.map((s: any) => (
-              <span key={s.payer} className="bg-orange-50 text-orange-700 rounded px-2 py-1">{s.payer}：{fmt(s.total_amount)}（{s.times}次）</span>
-            ))}
             <span className="bg-blue-50 text-blue-700 rounded px-2 py-1">合计 <b>{fmt(summary.total)}</b></span>
           </div>
         )}
@@ -543,7 +540,7 @@ tr.even td{background:#f8fafc}
                 <TableCell>{r.payer}</TableCell>
                 <TableCell>{r.reason || '-'}</TableCell>
                 <TableCell>{r.handler || '-'}</TableCell>
-                <TableCell className="text-left max-w-[150px] truncate">{r.remark || '-'}</TableCell>
+                <TableCell className="text-center max-w-[150px] truncate">{r.remark || '-'}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" onClick={() => { setEdit(r); setForm({ fee_date: r.fee_date, meal_type: r.meal_type, amount: r.amount, payer: r.payer, reason: r.reason || FEE_REASONS[0], remark: r.remark || '', handler: r.handler || '' }); setOpen(true); }}>
                     <Pencil className="h-4 w-4" />
@@ -728,12 +725,12 @@ function RechargePanel() {
     <Card>
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">饭卡充值记录</h3>
+          <h3 className="text-sm font-semibold">充值记录</h3>
           <div className="flex gap-2 items-center">
             <Input type="month" className="h-8 w-36" value={month} onChange={(e) => setMonth(e.target.value)} />
             <Input className="h-8 w-36" placeholder="搜索姓名/工号/卡号" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(1); }} />
             <Button size="sm" variant="outline" onClick={() => { setFileName(''); setCsvHeaders([]); setCsvPreview([]); setResult(null); setImportOpen(true); }}>
-              <Upload className="mr-1 h-4 w-4" />导入CSV
+              <Upload className="mr-1 h-4 w-4" />导入
             </Button>
           </div>
         </div>
@@ -757,7 +754,7 @@ function RechargePanel() {
           </TableHeader>
           <TableBody>
             {list.length === 0 ? (
-              <TableRow><TableCell colSpan={12} className="h-16 text-center text-muted-foreground">暂无充值记录，点击「导入CSV」批量导入</TableCell></TableRow>
+              <TableRow><TableCell colSpan={12} className="h-16 text-center text-muted-foreground">暂无充值记录，点击「导入」批量导入</TableCell></TableRow>
             ) : list.map((r, idx) => (
               <TableRow key={r.id}>
                 <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
@@ -790,7 +787,7 @@ function RechargePanel() {
       {/* 导入弹窗 */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="sm:max-w-[680px] max-h-[85vh] flex flex-col">
-          <DialogHeader><DialogTitle>导入饭卡充值 CSV</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>导入充值 CSV</DialogTitle></DialogHeader>
           <div className="space-y-3 overflow-y-auto pr-1">
             <div className="flex items-center gap-2">
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />

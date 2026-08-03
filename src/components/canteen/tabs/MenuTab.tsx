@@ -137,7 +137,7 @@ td .date{font-size:11px;color:#9ca3af;font-weight:normal}
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={copyPrev}><Copy className="mr-1 h-4 w-4" />复制上周</Button>
-              <Button size="sm" variant="outline" onClick={printPreview}><Printer className="mr-1 h-4 w-4" />打印预览</Button>
+              <Button size="sm" variant="outline" onClick={printPreview}><Printer className="mr-1 h-4 w-4" />打印</Button>
               <Button size="sm" variant="outline" onClick={() => { setTmplName(''); setTmplOpen(true); }}><BookmarkPlus className="mr-1 h-4 w-4" />存为模板</Button>
               <Button size="sm" variant="outline" onClick={() => setApplyOpen(true)} disabled={templates.length === 0}><FolderOpen className="mr-1 h-4 w-4" />套用模板</Button>
               <Button size="sm" onClick={save}><Save className="mr-1 h-4 w-4" />保存</Button>

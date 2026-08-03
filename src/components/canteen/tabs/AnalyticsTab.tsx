@@ -252,7 +252,7 @@ export default function AnalyticsTab() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" tick={{ fontSize: 10 }} />
                       <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(v: any, n: any) => [n === 'quantity' ? `${v} ${topSupplies[0]?.unit || ''}` : fmt(v), n === 'quantity' ? '数量' : '金额']} />
+                      <Tooltip formatter={(v: any, n: any) => [n === '数量' ? `${v} ${topSupplies[0]?.unit || ''}` : fmt(v), n]} />
                       <Legend />
                       <Bar dataKey="quantity" name="数量" fill="#2563eb" />
                       <Bar dataKey="amount" name="金额" fill="#f59e0b" />

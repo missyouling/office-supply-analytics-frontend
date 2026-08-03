@@ -205,7 +205,7 @@ ${rows}
               <TableHead className="w-12 text-center">序号</TableHead><TableHead>采购单号</TableHead>
               <TableHead className="w-28">日期</TableHead><TableHead>供应商</TableHead>
               <TableHead className="w-20">明细</TableHead><TableHead className="w-24">总金额</TableHead>
-              <TableHead className="w-24">实支</TableHead><TableHead className="w-[150px] text-center">操作</TableHead>
+              <TableHead className="w-24">实支</TableHead><TableHead className="w-[110px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -222,7 +222,6 @@ ${rows}
                 <TableCell className="text-right">{p.actual_pay ? fmt(p.actual_pay) : '-'}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" title="查看" onClick={() => viewPurchase(p)}><Eye className="h-4 w-4 text-blue-600" /></Button>
-                  <Button variant="ghost" size="icon" title="打印预览" onClick={() => printPurchase(p)}><Printer className="h-4 w-4 text-green-600" /></Button>
                   <Button variant="ghost" size="icon" title="编辑" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" title="删除" onClick={() => setConfirm({ open: true, target: p })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                 </TableCell>
@@ -353,7 +352,7 @@ ${rows}
                 <div className="text-sm">合计：<span className="font-bold text-red-600 text-base">{fmt(viewDetail.total_amount)}</span></div>
                 <div className="flex gap-2">
                   <DialogClose asChild><Button variant="outline">关闭</Button></DialogClose>
-                  <Button onClick={() => printPurchase(viewDetail)}><Printer className="mr-1 h-4 w-4" />打印预览</Button>
+                  <Button onClick={() => printPurchase(viewDetail)}><Printer className="mr-1 h-4 w-4" />打印</Button>
                 </div>
               </div>
             </>
@@ -428,12 +427,9 @@ function ExpensePanel() {
             </Button>
           </div>
         </div>
-        {/* 月度汇总条 */}
+        {/* 月度汇总（只显示合计） */}
         {Object.keys(summary).length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {Object.entries(summary).map(([k, v]) => (
-              <span key={k} className="text-xs bg-slate-100 rounded px-2 py-1">{k}：<b className="text-red-600">{fmt(v)}</b></span>
-            ))}
             <span className="text-xs bg-blue-50 text-blue-700 rounded px-2 py-1">合计：<b>{fmt(total)}</b></span>
           </div>
         )}
