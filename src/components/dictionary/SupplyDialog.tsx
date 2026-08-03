@@ -75,7 +75,7 @@ export default function SupplyDialog({ open, onClose, supply }: Props) {
         unit: form.unit,
         reference_price: price,
         category_id: parseInt(form.category_id),
-        status: form.status,
+        status: form.status as 'active' | 'inactive',
         remark: form.remark.trim(),
       };
 

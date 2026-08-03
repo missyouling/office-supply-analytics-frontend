@@ -70,7 +70,7 @@ const ToastTitle = React.forwardRef<
 ToastTitle.displayName = ToastPrimitives.Title.displayName;
 
 type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>;
-type ToastActionElement = React.ReactElement<typeof ToastAction>;
+type ToastActionElement = React.ReactElement<{ action: string }>;
 
 export {
   type ToastProps,

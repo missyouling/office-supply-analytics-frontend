@@ -41,8 +41,8 @@ export default function SupplySearch({ onSelect, inputRef }: Props) {
       supply_spec: supply.spec,
       unit: supply.unit,
       quantity: 1,
-      unit_price: supply.unit_price,
-      subtotal: supply.unit_price,
+      unit_price: supply.unit_price ?? supply.reference_price ?? 0,
+      subtotal: supply.unit_price ?? supply.reference_price ?? 0,
     });
     setQuery('');
     setOpen(false);
@@ -95,7 +95,7 @@ export default function SupplySearch({ onSelect, inputRef }: Props) {
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-blue-600">{formatCurrency(supply.unit_price)}</span>
+                    <span className="text-sm font-semibold text-blue-600">{formatCurrency(supply.unit_price ?? supply.reference_price ?? 0)}</span>
                     <Button size="icon" className="h-7 w-7 rounded-full">
                       <Plus className="h-3.5 w-3.5" />
                     </Button>

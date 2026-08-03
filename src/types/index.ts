@@ -29,6 +29,8 @@ export interface Supply {
   spec: string;
   unit: string;
   reference_price: number;
+  unit_price?: number;
+  category?: string;
   safety_stock: number;
   category_id: number | null;
   supplier_id: number | null;
@@ -78,6 +80,9 @@ export interface PaginatedResult<T> {
   total: number;
   page: number;
   limit: number;
+  total_sum?: number;
+  min_date?: string;
+  max_date?: string;
 }
 
 export const CATEGORIES = ['办公文具', '劳保用品', '清洁用品', '耗材', '其他'] as const;

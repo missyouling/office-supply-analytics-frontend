@@ -144,7 +144,7 @@ tr:nth-child(even) td{background:#f8fafc}
       // 首次加载自动填充日期范围（最早起始日期 ~ 最晚结束日期）
       if (!autoFilledRef.current && r.min_date && r.max_date) {
         autoFilledRef.current = true;
-        setFilters(prev => prev.date_from === '' && prev.date_to === '' ? { ...prev, date_from: r.min_date, date_to: r.max_date } : prev);
+        setFilters(prev => prev.date_from === '' && prev.date_to === '' ? { ...prev, date_from: r.min_date || '', date_to: r.max_date || '' } : prev);
       }
     } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
     finally { setLoading(false); }

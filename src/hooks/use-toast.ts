@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { ToastProps } from './toast';
+import type { ToastProps } from '@/components/ui/toast';
 
 const TOAST_LIMIT = 5;
 const TOAST_REMOVE_DELAY = 4000;

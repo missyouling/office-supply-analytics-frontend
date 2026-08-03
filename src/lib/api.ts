@@ -106,3 +106,87 @@ export const paymentRequestsApi = {
   update: (id: number, data: Partial<PaymentRequest>) => req<ApiResponse>('/api/payment-requests/' + id, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) => req<ApiResponse>('/api/payment-requests/' + id, { method: 'DELETE' }),
 };
+
+// =============================================
+// 食堂管理模块 API
+// =============================================
+const C = '/api/canteen';
+
+export const canteenApi = {
+  // 食材分类
+  categories: {
+    list: () => req<{ ok: boolean; items: any[] }>(C + '/categories'),
+    create: (data: any) => req<ApiResponse>(C + '/categories', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) => req<ApiResponse>(C + '/categories/' + id, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => req<ApiResponse>(C + '/categories/' + id, { method: 'DELETE' }),
+  },
+  // 食材字典
+  supplies: {
+    list: (params?: any) => req<PaginatedResult<any>>(C + '/supplies' + qs(params || {})),
+    all: () => req<{ ok: boolean; items: any[] }>(C + '/supplies/all'),
+    create: (data: any) => req<ApiResponse>(C + '/supplies', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) => req<ApiResponse>(C + '/supplies/' + id, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => req<ApiResponse>(C + '/supplies/' + id, { method: 'DELETE' }),
+  },
+  // 费用科目
+  expenseCategories: {
+    list: () => req<{ ok: boolean; items: any[] }>(C + '/expense-categories'),
+    create: (data: any) => req<ApiResponse>(C + '/expense-categories', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) => req<ApiResponse>(C + '/expense-categories/' + id, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => req<ApiResponse>(C + '/expense-categories/' + id, { method: 'DELETE' }),
+  },
+  // 采购单
+  purchases: {
+    list: (params?: any) => req<PaginatedResult<any>>(C + '/purchases' + qs(params || {})),
+    get: (id: number) => req<ApiResponse>(C + '/purchases/' + id),
+    create: (data: any) => req<ApiResponse>(C + '/purchases', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) => req<ApiResponse>(C + '/purchases/' + id, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => req<ApiResponse>(C + '/purchases/' + id, { method: 'DELETE' }),
+    exportCsv: (params?: { date_from?: string; date_to?: string }) =>
+      fetch(C + '/purchases/export/csv' + qs(params || {})).then((r) => r.blob()),
+  },
+  // 其他费用
+  expenses: {
+    list: (params?: any) => req<PaginatedResult<any>>(C + '/expenses' + qs(params || {})),
+    create: (data: any) => req<ApiResponse>(C + '/expenses', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) => req<ApiResponse>(C + '/expenses/' + id, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => req<ApiResponse>(C + '/expenses/' + id, { method: 'DELETE' }),
+  },
+  // 每日收入
+  income: {
+    list: (params?: any) => req<PaginatedResult<any>>(C + '/income' + qs(params || {})),
+    get: (id: number) => req<ApiResponse>(C + '/income/' + id),
+    save: (data: any) => req<ApiResponse>(C + '/income', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id: number) => req<ApiResponse>(C + '/income/' + id, { method: 'DELETE' }),
+  },
+  // 资源占用费
+  resourceFees: {
+    list: (params?: any) => req<PaginatedResult<any>>(C + '/resource-fees' + qs(params || {})),
+    create: (data: any) => req<ApiResponse>(C + '/resource-fees', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) => req<ApiResponse>(C + '/resource-fees/' + id, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => req<ApiResponse>(C + '/resource-fees/' + id, { method: 'DELETE' }),
+    summary: (month: string) => req<ApiResponse>(C + '/resource-fees/summary/' + month),
+  },
+  // 每周菜单
+  menus: {
+    get: (week: string) => req<ApiResponse>(C + '/menus?week=' + encodeURIComponent(week)),
+    save: (data: any) => req<ApiResponse>(C + '/menus', { method: 'POST', body: JSON.stringify(data) }),
+    copy: (from: string, to: string) => req<ApiResponse>(C + '/menus/copy', { method: 'POST', body: JSON.stringify({ from, to }) }),
+  },
+  // 菜单模板
+  menuTemplates: {
+    list: () => req<{ ok: boolean; items: any[] }>(C + '/menu-templates'),
+    create: (data: any) => req<ApiResponse>(C + '/menu-templates', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id: number) => req<ApiResponse>(C + '/menu-templates/' + id, { method: 'DELETE' }),
+  },
+  // 数据分析
+  analytics: {
+    summary: (month?: string) => req<ApiResponse>(C + '/analytics/summary' + qs({ month })),
+    dailyTrend: (month?: string) => req<ApiResponse>(C + '/analytics/daily-trend' + qs({ month })),
+    expenseBreakdown: (month?: string) => req<ApiResponse>(C + '/analytics/expense-breakdown' + qs({ month })),
+    foodShare: (month?: string) => req<ApiResponse>(C + '/analytics/food-share' + qs({ month })),
+    topSupplies: (month?: string, limit?: number) => req<ApiResponse>(C + '/analytics/top-supplies' + qs({ month, limit })),
+    monthlyCompare: (params?: any) => req<ApiResponse>(C + '/analytics/monthly-compare' + qs(params || {})),
+    suggestions: (month?: string) => req<ApiResponse>(C + '/analytics/suggestions' + qs({ month })),
+  },
+};
