@@ -113,7 +113,8 @@ function IncomePanel() {
   useEffect(() => { load(); }, [load]);
 
   const totals = list.reduce((acc, d) => {
-    acc.count += d.total_count || 0; acc.amount += d.total_amount || 0;
+    // 人次口径：午餐+晚餐（早餐不计人次）
+    acc.count += (d.lunch_count || 0) + (d.dinner_count || 0); acc.amount += d.total_amount || 0;
     acc.breakfast += d.breakfast_amount || 0; acc.lunch += d.lunch_amount || 0; acc.dinner += d.dinner_amount || 0;
     return acc;
   }, { count: 0, amount: 0, breakfast: 0, lunch: 0, dinner: 0 });
@@ -216,7 +217,7 @@ tr.even td{background:#f8fafc}
 <tr class="even"><td>午餐</td><td>${d.lunch_count}</td><td class="num">¥${Number(d.lunch_amount).toFixed(2)}</td></tr>
 <tr><td>晚餐</td><td>${d.dinner_count}</td><td class="num">¥${Number(d.dinner_amount).toFixed(2)}</td></tr>
 </tbody></table>
-<div class="total">总人次：${d.total_count}　总收入：¥${Number(d.total_amount).toFixed(2)}</div>
+<div class="total">总人次：${(d.lunch_count || 0) + (d.dinner_count || 0)}　总收入：¥${Number(d.total_amount).toFixed(2)}</div>
 ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.remark}</p>` : ''}
 <script>setTimeout(()=>window.print(),300)</script>
 </body></html>`;
@@ -273,7 +274,7 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
                 <TableCell className="text-right">{fmt(d.lunch_amount)}</TableCell>
                 <TableCell>{d.dinner_count}</TableCell>
                 <TableCell className="text-right">{fmt(d.dinner_amount)}</TableCell>
-                <TableCell className="text-center">{d.total_count}</TableCell>
+                <TableCell className="text-center">{(d.lunch_count || 0) + (d.dinner_count || 0)}</TableCell>
                 <TableCell className="text-right font-medium text-red-600">{fmt(d.total_amount)}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" title="查看" onClick={() => viewIncome(d)}><Eye className="h-4 w-4 text-blue-600" /></Button>
@@ -362,7 +363,7 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
                   <span>早餐：{parsed.breakfast_count} 次 / {fmt(parsed.breakfast_amount)}</span>
                   <span>午餐：{parsed.lunch_count} 次 / {fmt(parsed.lunch_amount)}</span>
                   <span>晚餐：{parsed.dinner_count} 次 / {fmt(parsed.dinner_amount)}</span>
-                  <span className="text-blue-700 font-medium">总人次 {parsed.breakfast_count + parsed.lunch_count + parsed.dinner_count} / 总额 {fmt(parsed.breakfast_amount + parsed.lunch_amount + parsed.dinner_amount)}</span>
+                  <span className="text-blue-700 font-medium">总人次（午+晚）{parsed.lunch_count + parsed.dinner_count} / 总额 {fmt(parsed.breakfast_amount + parsed.lunch_amount + parsed.dinner_amount)}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">将写入 {importDate}（如该日期已有数据将被覆盖）</p>
               </div>
@@ -394,7 +395,7 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
                 </TableBody>
               </Table>
               <div className="flex items-center justify-between pt-2 border-t">
-                <div className="text-sm">总人次 <b>{viewItem.total_count}</b>　总收入 <b className="text-red-600">{fmt(viewItem.total_amount)}</b></div>
+                <div className="text-sm">总人次 <b>{(viewItem.lunch_count || 0) + (viewItem.dinner_count || 0)}</b>　总收入 <b className="text-red-600">{fmt(viewItem.total_amount)}</b></div>
                 <div className="flex gap-2">
                   <DialogClose asChild><Button variant="outline">关闭</Button></DialogClose>
                   <Button onClick={() => printIncome(viewItem)}><Printer className="mr-1 h-4 w-4" />打印预览</Button>

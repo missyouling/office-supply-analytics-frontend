@@ -45,7 +45,7 @@ function KpiCards({ summary }: { summary: Summary | null }) {
         <p className="text-[11px] text-muted-foreground">{summary.profit >= 0 ? '盈余' : '亏损'}</p>
       </CardContent></Card>
       <Card><CardContent className="p-4">
-        <p className="text-xs text-muted-foreground">就餐人次</p>
+        <p className="text-xs text-muted-foreground">就餐人次（午+晚）</p>
         <p className="text-2xl font-bold text-slate-700">{fmtNum(summary.income.count)}</p>
         <p className="text-[11px] text-muted-foreground">
           早 {summary.income.breakfast ? fmt(summary.income.breakfast) : '-'} / 午 {summary.income.lunch ? fmt(summary.income.lunch) : '-'} / 晚 {summary.income.dinner ? fmt(summary.income.dinner) : '-'}
@@ -109,12 +109,17 @@ export default function AnalyticsTab() {
     }
   };
 
-  // 每日盈亏明细表
-  const dailyTable = dailyTrend.map((d, i) => ({
-    序号: i + 1, 日期: d.date, 收入: d.income || 0, 支出: d.expense || 0,
-    盈亏: (d.income || 0) - (d.expense || 0), 人次: d.count || 0,
-    人均: d.count ? ((d.income || 0) / d.count).toFixed(2) : '-',
-  }));
+  // 每日盈亏明细表（支出 = 当日采购 + 当月其他费用分摊）
+  const dailyTable = dailyTrend.map((d, i) => {
+    const share = d.share_expense || 0;
+    const totalExpense = (d.expense || 0) + share;
+    return {
+      序号: i + 1, 日期: d.date, 收入: d.income || 0, 支出: totalExpense,
+      采购: d.expense || 0, 分摊支出: share,
+      盈亏: (d.income || 0) - totalExpense, 人次: d.count || 0,
+      人均: d.count ? ((d.income || 0) / d.count).toFixed(2) : '-',
+    };
+  });
 
   const expensePieData = [
     { name: '食材采购', value: expenseBreakdown.food || 0 },
@@ -132,8 +137,8 @@ export default function AnalyticsTab() {
   }));
 
   const exportDetail = () => {
-    const rows = [['序号', '日期', '收入', '支出', '盈亏', '人次', '人均']];
-    dailyTable.forEach((r) => rows.push([r.序号, r.日期, r.收入, r.支出, r.盈亏, r.人次, r.人均]));
+    const rows = [['序号', '日期', '收入', '支出', '采购', '分摊支出', '盈亏', '人次', '人均']];
+    dailyTable.forEach((r) => rows.push([r.序号, r.日期, r.收入, r.支出, r.采购, r.分摊支出, r.盈亏, r.人次, r.人均]));
     const csv = '\uFEFF' + rows.map((r) => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -141,6 +146,12 @@ export default function AnalyticsTab() {
     a.href = url; a.download = `食堂收支明细_${period === 'month' ? month : `${range.from}_${range.to}`}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
+
+  // 趋势图数据：支出 = 采购 + 分摊
+  const trendChartData = dailyTrend.map((d) => ({
+    ...d,
+    expense: (d.expense || 0) + (d.share_expense || 0),
+  }));
 
   return (
     <div className="space-y-4">
@@ -185,7 +196,7 @@ export default function AnalyticsTab() {
               <CardHeader><CardTitle className="text-sm">每日收支趋势</CardTitle></CardHeader>
               <CardContent className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={dailyTrend}>
+                  <ComposedChart data={trendChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                     <YAxis tick={{ fontSize: 10 }} />
@@ -275,18 +286,21 @@ export default function AnalyticsTab() {
                   <TableRow>
                     <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28">日期</TableHead>
                     <TableHead className="w-28">收入</TableHead><TableHead className="w-28">支出</TableHead>
+                    <TableHead className="w-24">采购</TableHead><TableHead className="w-28">分摊支出</TableHead>
                     <TableHead className="w-28">盈亏</TableHead><TableHead className="w-20">人次</TableHead><TableHead className="w-24">人均</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {dailyTable.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="h-16 text-center text-muted-foreground">本月无记录</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="h-16 text-center text-muted-foreground">本月无记录</TableCell></TableRow>
                   ) : dailyTable.map((r) => (
                     <TableRow key={r.序号}>
                       <TableCell className="text-center text-muted-foreground">{r.序号}</TableCell>
                       <TableCell>{r.日期}</TableCell>
                       <TableCell className="text-right text-green-600">{fmt(r.收入)}</TableCell>
                       <TableCell className="text-right text-red-600">{r.支出 ? fmt(r.支出) : '-'}</TableCell>
+                      <TableCell className="text-right">{r.采购 ? fmt(r.采购) : '-'}</TableCell>
+                      <TableCell className="text-right text-amber-600">{r.分摊支出 ? fmt(r.分摊支出) : '-'}</TableCell>
                       <TableCell className={`text-right font-medium ${r.盈亏 >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(r.盈亏)}</TableCell>
                       <TableCell>{r.人次 || '-'}</TableCell>
                       <TableCell>{r.人均}</TableCell>
