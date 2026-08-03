@@ -169,13 +169,15 @@ function PurchasePanel() {
             <Input placeholder="采购渠道" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })} />
             <Input type="number" placeholder="实支金额" value={form.actual_pay || ''} onChange={(e) => setForm({ ...form, actual_pay: parseFloat(e.target.value) || 0 })} />
           </div>
-          <div className="flex items-center gap-2">
-            <Input placeholder="搜索食材添加…" value={rowKeyword} onChange={(e) => { setRowKeyword(e.target.value); setRowOpen(true); loadSupplies(e.target.value); }} />
+          <div className="relative">
+            <Input placeholder="搜索食材添加…" value={rowKeyword}
+              onFocus={() => { setRowOpen(true); loadSupplies(rowKeyword); }}
+              onChange={(e) => { setRowKeyword(e.target.value); setRowOpen(true); loadSupplies(e.target.value); }} />
             {rowOpen && (
-              <div className="flex-1 max-h-40 overflow-y-auto border rounded-md p-1">
+              <div className="absolute z-20 left-0 right-0 top-full mt-1 max-h-40 overflow-y-auto border rounded-md bg-white shadow-lg p-1">
                 {filteredSupplies.length === 0 ? <p className="text-xs text-muted-foreground p-2">无匹配食材，请先在「数据字典」中添加</p> :
                   filteredSupplies.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between px-2 py-1 hover:bg-slate-100 rounded cursor-pointer" onClick={() => addRow(s)}>
+                    <div key={s.id} className="flex items-center justify-between px-2 py-1.5 hover:bg-slate-100 rounded cursor-pointer" onClick={() => addRow(s)}>
                       <span className="text-sm">{s.name} <span className="text-muted-foreground text-xs">{s.spec || ''} {s.unit}</span></span>
                       <span className="text-xs text-blue-600">{fmt(s.reference_price)}</span>
                     </div>
