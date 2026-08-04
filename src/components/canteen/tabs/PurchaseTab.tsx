@@ -394,24 +394,27 @@ ${rows}
   );
 }
 
-// ---------- 其他费用录入（水电气自动计算 + 人工/维护手动） ----------
+// ---------- 其他费用录入（水电气自动计算 + 实际金额 + 工资/维护手动） ----------
 function ExpensePanel() {
   const [list, setList] = useState<any[]>([]);
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [people, setPeople] = useState(0); // 当月午餐+晚餐总人次（自动从每日收入累加）
-  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [people, setPeople] = useState(0); // 当月用餐总人次（早餐+晚餐，自动从每日收入累加）
   const [saving, setSaving] = useState(false);
 
-  // 参数（可手动录入，默认值）
+  // 估算计算参数（可手动录入，默认值）
   const [params, setParams] = useState({
     water_per_capita: 25,   // 人均用水量 L/人
     water_price: 5.22,      // 自来水单价 元/吨
     elec_usage: 50,         // 用电量 度/天
-    gas_usage: 40,          // 用气量 m³/天
+    gas_usage: 10,          // 用气量 m³/天
     gas_price: 3.55,        // 天然气单价 元/m³
-    labor: 0,               // 人工费（手动）
-    maintenance: 0,         // 设备维护费（手动）
+    labor: 0,               // 工资（手动估算）
+    maintenance: 0,         // 设备维护费（手动估算）
   });
+  // 实际金额（用户可手填，>0 时数据分析优先采用）
+  const [actual, setActual] = useState<Record<string, number>>({ water: 0, elec: 0, gas: 0, labor: 0, maintenance: 0 });
+  // 备注
+  const [remark, setRemark] = useState('');
 
   // 当月已过天数：所选月份==当前月 → 当前日（8.4 → 4 天），历史月份 → 整月天数
   const elapsedDays = (m: string) => {
@@ -423,15 +426,21 @@ function ExpensePanel() {
   };
   const days = elapsedDays(month);
 
-  // 水费 = 人均用水量(L→吨) × 当月用餐人次(午+晚) × 水单价
-  const waterAmount = people * (params.water_per_capita / 1000) * params.water_price;
-  // 电费 = 用电量 × 天数
-  const elecAmount = params.elec_usage * days;
-  // 气费 = 用气量 × 天数 × 气单价
-  const gasAmount = params.gas_usage * days * params.gas_price;
-  const laborAmount = Number(params.labor) || 0;
-  const maintAmount = Number(params.maintenance) || 0;
-  const total = waterAmount + elecAmount + gasAmount + laborAmount + maintAmount;
+  // 估算金额
+  const waterEst = people * (params.water_per_capita / 1000) * params.water_price;
+  const elecEst = params.elec_usage * days;
+  const gasEst = params.gas_usage * days * params.gas_price;
+  const laborEst = Number(params.labor) || 0;
+  const maintEst = Number(params.maintenance) || 0;
+  // 分析金额（有实际用实际，无实际用估算）
+  const A = (key: string, est: number) => (Number(actual[key]) > 0 ? Number(actual[key]) : est);
+  const waterAmt = A('water', waterEst);
+  const elecAmt = A('elec', elecEst);
+  const gasAmt = A('gas', gasEst);
+  const laborAmt = A('labor', laborEst);
+  const maintAmt = A('maintenance', maintEst);
+  const totalEst = waterEst + elecEst + gasEst + laborEst + maintEst;
+  const totalAct = waterAmt + elecAmt + gasAmt + laborAmt + maintAmt;
 
   const load = useCallback(async () => {
     try {
@@ -440,22 +449,28 @@ function ExpensePanel() {
         canteenApi.income.list({ month, limit: 100 }),
       ]);
       setList(r.items);
-      const s: Record<string, number> = {};
-      for (const it of r.items) s[it.category] = (s[it.category] || 0) + Number(it.amount || 0);
-      setSummary(s);
-      // 用餐人次 = 午餐+晚餐 人次累加（早餐不计人次）
-      const p = (inc.items || []).reduce((acc: number, d: any) => acc + (Number(d.lunch_count) || 0) + (Number(d.dinner_count) || 0), 0);
+      // 用餐人次 = 早餐+晚餐 人次累加
+      const p = (inc.items || []).reduce((acc: number, d: any) => acc + (Number(d.breakfast_count) || 0) + (Number(d.dinner_count) || 0), 0);
       setPeople(p);
-      // 回显已保存参数（remark 存 JSON）
+      // 回显：参数存 params(JSON)，实际金额存 actual_amount，备注取任一条非空
       const find = (cat: string) => r.items.find((e: any) => e.category === cat);
-      const w = find('水费'), e = find('电费'), g = find('燃气费'), l = find('人工费'), m = find('设备维护费');
-      const prs = (rec: any, dft: any) => { if (!rec?.remark) return dft; try { return { ...dft, ...JSON.parse(rec.remark) }; } catch { return dft; } };
+      const w = find('水费'), e = find('电费'), g = find('燃气费'), l = find('工资') || find('人工费'), m = find('设备维护费');
+      const prs = (rec: any, dft: any) => { if (!rec?.params) return dft; try { return { ...dft, ...JSON.parse(rec.params) }; } catch { return dft; } };
       setParams((prev) => ({
         ...prs(w, prev), ...prs(e, prev), ...prs(g, prev),
         labor: l ? Number(l.amount) || 0 : prev.labor,
         maintenance: m ? Number(m.amount) || 0 : prev.maintenance,
       }));
-    } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
+      setActual({
+        water: w ? Number(w.actual_amount) || 0 : 0,
+        elec: e ? Number(e.actual_amount) || 0 : 0,
+        gas: g ? Number(g.actual_amount) || 0 : 0,
+        labor: l ? Number(l.actual_amount) || 0 : 0,
+        maintenance: m ? Number(m.actual_amount) || 0 : 0,
+      });
+      const rmk = (r.items.find((x: any) => x.remark) || { remark: '' }).remark;
+      setRemark(rmk || '');
+    } catch (err: any) { showToast('加载失败', err.message, 'destructive'); }
   }, [month]);
   useEffect(() => { load(); }, [load]);
 
@@ -463,24 +478,36 @@ function ExpensePanel() {
     setSaving(true);
     try {
       const items = [
-        { category: '水费', amount: waterAmount, remark: JSON.stringify({ water_per_capita: params.water_per_capita, water_price: params.water_price }) },
-        { category: '电费', amount: elecAmount, remark: JSON.stringify({ elec_usage: params.elec_usage }) },
-        { category: '燃气费', amount: gasAmount, remark: JSON.stringify({ gas_usage: params.gas_usage, gas_price: params.gas_price }) },
-        { category: '人工费', amount: laborAmount, remark: '' },
-        { category: '设备维护费', amount: maintAmount, remark: '' },
+        { category: '水费', amount: waterEst, actual_amount: Number(actual.water) || 0, params: JSON.stringify({ water_per_capita: params.water_per_capita, water_price: params.water_price }), remark },
+        { category: '电费', amount: elecEst, actual_amount: Number(actual.elec) || 0, params: JSON.stringify({ elec_usage: params.elec_usage }), remark },
+        { category: '燃气费', amount: gasEst, actual_amount: Number(actual.gas) || 0, params: JSON.stringify({ gas_usage: params.gas_usage, gas_price: params.gas_price }), remark },
+        { category: '工资', amount: laborEst, actual_amount: Number(actual.labor) || 0, params: '', remark },
+        { category: '设备维护费', amount: maintEst, actual_amount: Number(actual.maintenance) || 0, params: '', remark },
       ];
       await canteenApi.expenses.upsert({ month, items });
       showToast('✅ 已保存');
       load();
-    } catch (e: any) { showToast('保存失败', e.message, 'destructive'); }
+    } catch (err: any) { showToast('保存失败', err.message, 'destructive'); }
     finally { setSaving(false); }
   };
+
+  const EstCell = ({ label, value, onChange }: any) => (
+    <TableCell className="text-center">
+      <Input type="number" className="h-7 w-20 text-center" value={value || ''} placeholder="0" onChange={(e) => onChange(parseFloat(e.target.value) || 0)} />
+      <span className="text-xs text-muted-foreground block">{label}</span>
+    </TableCell>
+  );
+  const ActCell = ({ idx, value }: any) => (
+    <TableCell className="text-center">
+      <Input type="number" className={`h-7 w-20 text-center ${Number(value) > 0 ? 'border-green-400' : ''}`} value={Number(value) > 0 ? value : ''} placeholder="(可填)" onChange={(e) => setActual({ ...actual, [idx]: parseFloat(e.target.value) || 0 })} />
+    </TableCell>
+  );
 
   return (
     <Card>
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">其他费用（水电气、人工费）</h3>
+          <h3 className="text-sm font-semibold">其他费用（水电气、工资）</h3>
           <div className="flex gap-2 items-center">
             <Input type="month" className="h-8 w-36" value={month} onChange={(e) => setMonth(e.target.value)} />
             <Button size="sm" onClick={save} disabled={saving}>{saving ? '保存中…' : '保存'}</Button>
@@ -488,16 +515,18 @@ function ExpensePanel() {
         </div>
         {/* 汇总 */}
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="bg-blue-50 text-blue-700 rounded px-2 py-1">月费用合计 <b>{fmt(total)}</b></span>
-          <span className="bg-slate-100 rounded px-2 py-1">用餐人次（午+晚）{people}</span>
+          <span className="bg-blue-50 text-blue-700 rounded px-2 py-1">分析合计 <b>{fmt(totalAct)}</b></span>
+          <span className="bg-slate-100 rounded px-2 py-1">估算合计 {fmt(totalEst)}</span>
+          <span className="bg-slate-100 rounded px-2 py-1">用餐人次（早+晚）{people}</span>
           <span className="bg-slate-100 rounded px-2 py-1">计费天数 {days}</span>
         </div>
         <Table className="max-h-[45vh]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-24 text-center">科目</TableHead>
-              <TableHead className="text-center">计算参数</TableHead><TableHead className="w-36 text-center">计算式</TableHead>
-              <TableHead className="w-28 text-center">金额</TableHead>
+              <TableHead className="w-10 text-center">序号</TableHead><TableHead className="w-20 text-center">科目</TableHead>
+              <TableHead className="text-center">估算参数/计算式</TableHead>
+              <TableHead className="w-24 text-center">估算金额</TableHead>
+              <TableHead className="w-24 text-center">实际金额</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -506,53 +535,57 @@ function ExpensePanel() {
               <TableCell className="text-center text-muted-foreground">1</TableCell>
               <TableCell className="font-medium text-center">水费</TableCell>
               <TableCell className="text-center">
-                <span className="inline-flex items-center gap-1">
-                  <Input type="number" className="h-7 w-20 text-center" value={params.water_per_capita || ''} onChange={(e) => setParams({ ...params, water_per_capita: parseFloat(e.target.value) || 0 })} />
-                  <span className="text-xs text-muted-foreground">L/人 ×</span>
-                  <Input type="number" className="h-7 w-20 text-center" value={params.water_price || ''} onChange={(e) => setParams({ ...params, water_price: parseFloat(e.target.value) || 0 })} />
-                  <span className="text-xs text-muted-foreground">元/吨</span>
+                <span className="inline-flex items-center gap-1 text-xs">
+                  <Input type="number" className="h-7 w-16 text-center" value={params.water_per_capita || ''} onChange={(e) => setParams({ ...params, water_per_capita: parseFloat(e.target.value) || 0 })} />
+                  <span className="text-muted-foreground">L/人 ×</span>
+                  <Input type="number" className="h-7 w-16 text-center" value={params.water_price || ''} onChange={(e) => setParams({ ...params, water_price: parseFloat(e.target.value) || 0 })} />
+                  <span className="text-muted-foreground">元/吨</span>
                 </span>
+                <div className="text-xs text-muted-foreground mt-1">{people}人次×{params.water_per_capita}L/1000×{params.water_price}元</div>
               </TableCell>
-              <TableCell className="text-center text-xs text-muted-foreground">{people}人次×{params.water_per_capita}L/1000×{params.water_price}元</TableCell>
-              <TableCell className="font-medium text-blue-600 text-center">{fmt(waterAmount)}</TableCell>
+              <TableCell className="font-medium text-center">{fmt(waterEst)}</TableCell>
+              <ActCell idx="water" value={actual.water} />
             </TableRow>
             {/* 电费 */}
             <TableRow>
               <TableCell className="text-center text-muted-foreground">2</TableCell>
               <TableCell className="font-medium text-center">电费</TableCell>
               <TableCell className="text-center">
-                <span className="inline-flex items-center gap-1">
-                  <Input type="number" className="h-7 w-20 text-center" value={params.elec_usage || ''} onChange={(e) => setParams({ ...params, elec_usage: parseFloat(e.target.value) || 0 })} />
-                  <span className="text-xs text-muted-foreground">度/天 × {days}天</span>
+                <span className="inline-flex items-center gap-1 text-xs">
+                  <Input type="number" className="h-7 w-16 text-center" value={params.elec_usage || ''} onChange={(e) => setParams({ ...params, elec_usage: parseFloat(e.target.value) || 0 })} />
+                  <span className="text-muted-foreground">度/天 × {days}天</span>
                 </span>
+                <div className="text-xs text-muted-foreground mt-1">{params.elec_usage}度×{days}天</div>
               </TableCell>
-              <TableCell className="text-center text-xs text-muted-foreground">{params.elec_usage}度×{days}天</TableCell>
-              <TableCell className="font-medium text-blue-600 text-center">{fmt(elecAmount)}</TableCell>
+              <TableCell className="font-medium text-center">{fmt(elecEst)}</TableCell>
+              <ActCell idx="elec" value={actual.elec} />
             </TableRow>
             {/* 气费 */}
             <TableRow>
               <TableCell className="text-center text-muted-foreground">3</TableCell>
               <TableCell className="font-medium text-center">气费</TableCell>
               <TableCell className="text-center">
-                <span className="inline-flex items-center gap-1">
-                  <Input type="number" className="h-7 w-20 text-center" value={params.gas_usage || ''} onChange={(e) => setParams({ ...params, gas_usage: parseFloat(e.target.value) || 0 })} />
-                  <span className="text-xs text-muted-foreground">m³/天 × {days}天 ×</span>
-                  <Input type="number" className="h-7 w-20 text-center" value={params.gas_price || ''} onChange={(e) => setParams({ ...params, gas_price: parseFloat(e.target.value) || 0 })} />
-                  <span className="text-xs text-muted-foreground">元/m³</span>
+                <span className="inline-flex items-center gap-1 text-xs">
+                  <Input type="number" className="h-7 w-16 text-center" value={params.gas_usage || ''} onChange={(e) => setParams({ ...params, gas_usage: parseFloat(e.target.value) || 0 })} />
+                  <span className="text-muted-foreground">m³/天 × {days}天 ×</span>
+                  <Input type="number" className="h-7 w-16 text-center" value={params.gas_price || ''} onChange={(e) => setParams({ ...params, gas_price: parseFloat(e.target.value) || 0 })} />
+                  <span className="text-muted-foreground">元/m³</span>
                 </span>
+                <div className="text-xs text-muted-foreground mt-1">{params.gas_usage}m³×{days}天×{params.gas_price}元</div>
               </TableCell>
-              <TableCell className="text-center text-xs text-muted-foreground">{params.gas_usage}m³×{days}天×{params.gas_price}元</TableCell>
-              <TableCell className="font-medium text-blue-600 text-center">{fmt(gasAmount)}</TableCell>
+              <TableCell className="font-medium text-center">{fmt(gasEst)}</TableCell>
+              <ActCell idx="gas" value={actual.gas} />
             </TableRow>
-            {/* 人工费 */}
+            {/* 工资 */}
             <TableRow>
               <TableCell className="text-center text-muted-foreground">4</TableCell>
-              <TableCell className="font-medium text-center">人工费</TableCell>
+              <TableCell className="font-medium text-center">工资</TableCell>
               <TableCell className="text-center">
                 <Input type="number" className="h-7 w-32 text-center" value={params.labor || ''} onChange={(e) => setParams({ ...params, labor: parseFloat(e.target.value) || 0 })} />
+                <div className="text-xs text-muted-foreground mt-1">手动估算</div>
               </TableCell>
-              <TableCell className="text-center text-xs text-muted-foreground">手动录入</TableCell>
-              <TableCell className="font-medium text-blue-600 text-center">{fmt(laborAmount)}</TableCell>
+              <TableCell className="font-medium text-center">{fmt(laborEst)}</TableCell>
+              <ActCell idx="labor" value={actual.labor} />
             </TableRow>
             {/* 设备维护费 */}
             <TableRow>
@@ -560,25 +593,25 @@ function ExpensePanel() {
               <TableCell className="font-medium text-center">设备维护费</TableCell>
               <TableCell className="text-center">
                 <Input type="number" className="h-7 w-32 text-center" value={params.maintenance || ''} onChange={(e) => setParams({ ...params, maintenance: parseFloat(e.target.value) || 0 })} />
+                <div className="text-xs text-muted-foreground mt-1">手动估算</div>
               </TableCell>
-              <TableCell className="text-center text-xs text-muted-foreground">手动录入</TableCell>
-              <TableCell className="font-medium text-blue-600 text-center">{fmt(maintAmount)}</TableCell>
+              <TableCell className="font-medium text-center">{fmt(maintEst)}</TableCell>
+              <ActCell idx="maintenance" value={actual.maintenance} />
             </TableRow>
             {/* 合计行 */}
             <TableRow className="bg-slate-50">
-              <TableCell className="text-center text-muted-foreground" colSpan={4}>合计</TableCell>
-              <TableCell className="font-bold text-red-600 text-center">{fmt(total)}</TableCell>
+              <TableCell className="text-center text-muted-foreground" colSpan={3}>合计</TableCell>
+              <TableCell className="font-medium">{fmt(totalEst)}</TableCell>
+              <TableCell className="font-bold text-red-600">{fmt(totalAct)}</TableCell>
             </TableRow>
           </TableBody>
         </Table>
-        {/* 已保存记录（只读参考） */}
-        {list.length > 0 && (
-          <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 border-t pt-2">
-            {Object.entries(summary).map(([cat, amt]) => (
-              <span key={cat}>{cat} {fmt(amt)}</span>
-            ))}
-          </div>
-        )}
+        {/* 备注 */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground whitespace-nowrap">备注</label>
+          <Input className="h-8 text-sm" placeholder="填写当月其他费用备注（可选）" value={remark} onChange={(e) => setRemark(e.target.value)} />
+        </div>
+        <p className="text-xs text-muted-foreground">说明：水电气按参数自动估算；实际金额手填后数据分析以实际金额为准，未填实际金额时采用估算金额。</p>
       </CardContent>
     </Card>
   );
