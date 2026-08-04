@@ -14,10 +14,10 @@ const fmt = (n: any) => `¥${Number(n || 0).toFixed(2)}`;
 // 资源占用费收取缘由
 const FEE_REASONS = ['已报餐但未用餐', '未报餐而用餐', '未报餐未刷卡'];
 
-// ---------- CSV 解析（刷卡机个人餐别统计）----------
+// ---------- CSV 解析（刷卡机个人餐别统计，支持单日或多日）----------
 // 表头示例：工号,姓名,卡号,部门编号,部门名称,早餐|次数,早餐|金额,中餐|次数,中餐|金额,晚餐|次数,晚餐|金额,餐外消费|次数,餐外消费|金额,合计次数,合计金额
-// 数据行：每人一行；末行"汇总:"跳过
-function parseMealCsv(text: string): { breakfast_count: number; breakfast_amount: number; lunch_count: number; lunch_amount: number; dinner_count: number; dinner_amount: number; people: number } | null {
+// 数据行：每人一行；末行"汇总:"跳过；若表头含"日期"列则按日期分组生成多条（多日导入），否则归入用户所选日期（单日模板）
+function parseMealCsv(text: string, fallbackDate: string): { date: string; breakfast_count: number; breakfast_amount: number; lunch_count: number; lunch_amount: number; dinner_count: number; dinner_amount: number; people: number }[] | null {
   // 简单 CSV 解析（支持双引号包裹、逗号分隔）
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return null;
@@ -47,31 +47,44 @@ function parseMealCsv(text: string): { breakfast_count: number; breakfast_amount
   const dCnt = findCol('晚餐', '次数'), dAmt = findCol('晚餐', '金额');
   if (bCnt < 0 || lCnt < 0 || dCnt < 0) return null;
 
+  // 日期列：表头含"日期"或"date"（多日文件），否则用用户所选日期
+  let dateIdx = header.findIndex((h) => h.includes('日期') || h.includes('date'));
+  const parseDate = (v: string): string => {
+    const m = String(v || '').match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (!m) return '';
+    return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+  };
+
   const num = (v: string): number => {
     const n = parseFloat(String(v || '').replace(/[￥¥,\s]/g, ''));
     return isNaN(n) ? 0 : n;
   };
 
-  let breakfast_count = 0, breakfast_amount = 0;
-  let lunch_count = 0, lunch_amount = 0;
-  let dinner_count = 0, dinner_amount = 0;
-  let people = 0;
+  // 按日期分组累加（date -> 统计）
+  const byDate = new Map<string, { breakfast_count: number; breakfast_amount: number; lunch_count: number; lunch_amount: number; dinner_count: number; dinner_amount: number; people: number }>();
   for (let i = 1; i < lines.length; i++) {
     const cols = parseLine(lines[i]);
     const first = cols[0] || '';
     // 跳过汇总/合计行
     if (/汇总|合计|总计|小计/.test(first)) continue;
-    if (!/^\d/.test(first)) continue;
-    people++;
-    breakfast_count += num(cols[bCnt]);
-    breakfast_amount += num(cols[bAmt]);
-    lunch_count += num(cols[lCnt]);
-    lunch_amount += num(cols[lAmt]);
-    dinner_count += num(cols[dCnt]);
-    dinner_amount += num(cols[dAmt]);
+    if (!/^\d/.test(first) && !/\d{4}[-/]/.test(first)) continue;
+    let date = dateIdx >= 0 ? parseDate(cols[dateIdx]) : '';
+    if (!date) date = fallbackDate; // 无日期列或缺日期 → 归入所选日期
+    if (!byDate.has(date)) byDate.set(date, { breakfast_count: 0, breakfast_amount: 0, lunch_count: 0, lunch_amount: 0, dinner_count: 0, dinner_amount: 0, people: 0 });
+    const g = byDate.get(date)!;
+    g.people++;
+    g.breakfast_count += num(cols[bCnt]);
+    g.breakfast_amount += num(cols[bAmt]);
+    g.lunch_count += num(cols[lCnt]);
+    g.lunch_amount += num(cols[lAmt]);
+    g.dinner_count += num(cols[dCnt]);
+    g.dinner_amount += num(cols[dAmt]);
   }
-  if (people === 0) return null;
-  return { breakfast_count, breakfast_amount, lunch_count, lunch_amount, dinner_count, dinner_amount, people };
+  if (byDate.size === 0) return null;
+  // 按日期升序返回（1号→31号）
+  return Array.from(byDate.entries())
+    .map(([date, g]) => ({ date, ...g }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
 async function readCsvFile(file: File): Promise<string> {
@@ -164,7 +177,7 @@ function IncomePanel() {
     setFileName(f.name); setParsed(null);
     try {
       const text = await readCsvFile(f);
-      const r = parseMealCsv(text);
+      const r = parseMealCsv(text, new Date().toISOString().slice(0, 10));
       if (!r) { showToast('解析失败', '未识别到早餐/中餐/晚餐列，请确认是餐别统计导出文件', 'destructive'); return; }
       setParsed(r);
     } catch (e: any) { showToast('读取失败', e.message, 'destructive'); }
@@ -174,16 +187,22 @@ function IncomePanel() {
     if (!parsed || !importDate) return;
     setImporting(true);
     try {
-      await canteenApi.income.save({
-        income_date: importDate,
-        breakfast_count: parsed.breakfast_count, breakfast_amount: parsed.breakfast_amount,
-        lunch_count: parsed.lunch_count, lunch_amount: parsed.lunch_amount,
-        dinner_count: parsed.dinner_count, dinner_amount: parsed.dinner_amount,
-        remark: `CSV导入(${fileName})`,
-      });
-      showToast(`✅ 已导入 ${parsed.people} 人数据到 ${importDate}`);
+      // 支持多日：按日期逐条 upsert（同日期自动更新已有数据）
+      for (const day of parsed) {
+        await canteenApi.income.save({
+          income_date: day.date,
+          breakfast_count: day.breakfast_count, breakfast_amount: day.breakfast_amount,
+          lunch_count: day.lunch_count, lunch_amount: day.lunch_amount,
+          dinner_count: day.dinner_count, dinner_amount: day.dinner_amount,
+          remark: `CSV导入(${fileName})`,
+        });
+      }
+      const days = parsed.length;
+      const totalPeople = parsed.reduce((s: number, d: any) => s + (d.people || 0), 0);
+      showToast(days > 1 ? `✅ 已导入 ${days} 天数据（${totalPeople} 人次）` : `✅ 已导入 ${parsed[0].people} 人数据到 ${parsed[0].date}`);
       setImportOpen(false); setParsed(null); setFileName('');
-      setMonth(importDate.slice(0, 7)); load();
+      // 跳转到数据所在月份（取第一天的月份；跨月数据保持当月视图由用户切换）
+      setMonth((parsed[0].date || importDate).slice(0, 7)); load();
     } catch (e: any) { showToast('导入失败', e.message, 'destructive'); }
     finally { setImporting(false); }
   };
@@ -357,14 +376,44 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
             </div>
             {parsed && (
               <div className="rounded-md border bg-slate-50 p-3 space-y-1.5 text-sm">
-                <p className="font-medium">解析结果：{parsed.people} 人</p>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <span>早餐：{parsed.breakfast_count} 次 / {fmt(parsed.breakfast_amount)}</span>
-                  <span>午餐：{parsed.lunch_count} 次 / {fmt(parsed.lunch_amount)}</span>
-                  <span>晚餐：{parsed.dinner_count} 次 / {fmt(parsed.dinner_amount)}</span>
-                  <span className="text-blue-700 font-medium">总人次（午+晚）{parsed.lunch_count + parsed.dinner_count} / 总额 {fmt(parsed.breakfast_amount + parsed.lunch_amount + parsed.dinner_amount)}</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground">将写入 {importDate}（如该日期已有数据将被覆盖）</p>
+                {parsed.length === 1 ? (
+                  <>
+                    <p className="font-medium">解析结果：{parsed[0].people} 人（{parsed[0].date}）</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span>早餐：{parsed[0].breakfast_count} 次 / {fmt(parsed[0].breakfast_amount)}</span>
+                      <span>午餐：{parsed[0].lunch_count} 次 / {fmt(parsed[0].lunch_amount)}</span>
+                      <span>晚餐：{parsed[0].dinner_count} 次 / {fmt(parsed[0].dinner_amount)}</span>
+                      <span className="text-blue-700 font-medium">总人次（午+晚）{parsed[0].lunch_count + parsed[0].dinner_count} / 总额 {fmt(parsed[0].breakfast_amount + parsed[0].lunch_amount + parsed[0].dinner_amount)}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">将写入 {parsed[0].date}（如该日期已有数据将被覆盖）</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">解析结果：共 {parsed.length} 天，总 {parsed.reduce((s: number, d: any) => s + (d.people || 0), 0)} 人次</p>
+                    <div className="max-h-40 overflow-y-auto rounded border bg-white">
+                      <table className="w-full text-xs">
+                        <thead><tr className="bg-slate-100">
+                          <th className="px-2 py-1 text-center">日期</th><th className="px-2 py-1 text-center">早餐</th>
+                          <th className="px-2 py-1 text-center">午餐</th><th className="px-2 py-1 text-center">晚餐</th>
+                          <th className="px-2 py-1 text-center">人次（午+晚）</th><th className="px-2 py-1 text-center">总额</th>
+                        </tr></thead>
+                        <tbody>
+                          {parsed.map((d: any) => (
+                            <tr key={d.date} className="border-t">
+                              <td className="px-2 py-1 text-center">{d.date}</td>
+                              <td className="px-2 py-1 text-center">{d.breakfast_count}次/{fmt(d.breakfast_amount)}</td>
+                              <td className="px-2 py-1 text-center">{d.lunch_count}次/{fmt(d.lunch_amount)}</td>
+                              <td className="px-2 py-1 text-center">{d.dinner_count}次/{fmt(d.dinner_amount)}</td>
+                              <td className="px-2 py-1 text-center text-blue-700">{d.lunch_count + d.dinner_count}</td>
+                              <td className="px-2 py-1 text-center">{fmt(d.breakfast_amount + d.lunch_amount + d.dinner_amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">按日期逐日写入，已有日期的数据将被覆盖</p>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -620,7 +669,8 @@ function RechargePanel() {
   const [summary, setSummary] = useState<any>({ total: 0, count: 0, people: 0 });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const limit = 20;
+  const [loadingMore, setLoadingMore] = useState(false);
+  const limit = 50;
   const [confirm, setConfirm] = useState<{ open: boolean; target: any }>({ open: false, target: null });
 
   // 导入
@@ -633,17 +683,33 @@ function RechargePanel() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<any>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
+  // 首次加载 / 筛选变化 → 重置到第一页
   const load = useCallback(async () => {
+    setPage(1);
     try {
       const [r, s] = await Promise.all([
-        canteenApi.recharges.list({ month, keyword, page, limit }),
+        canteenApi.recharges.list({ month, keyword, page: 1, limit }),
         canteenApi.recharges.summary(month),
       ]);
       setList(r.items); setTotal(r.total); setSummary(s);
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
     } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
-  }, [month, keyword, page]);
+  }, [month, keyword]);
   useEffect(() => { load(); }, [load]);
+
+  // 滚动加载更多
+  const loadMore = async () => {
+    if (loadingMore || list.length >= total) return;
+    setLoadingMore(true);
+    try {
+      const next = page + 1;
+      const r = await canteenApi.recharges.list({ month, keyword, page: next, limit });
+      setList((prev) => [...prev, ...r.items]); setTotal(r.total); setPage(next);
+    } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
+    finally { setLoadingMore(false); }
+  };
 
   const del = async () => {
     if (!confirm.target) return;
@@ -748,47 +814,53 @@ function RechargePanel() {
             <span className="bg-slate-100 rounded px-2 py-1">{summary.people} 人</span>
           </div>
         )}
-        <Table className="max-h-[45vh]">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-20 text-center">姓名</TableHead>
-              <TableHead className="w-24 text-center">部门</TableHead><TableHead className="w-20 text-center">工号</TableHead>
-              <TableHead className="w-24 text-center">卡号</TableHead><TableHead className="w-24 text-center">流水号</TableHead>
-              <TableHead className="w-28 text-center">充值日期</TableHead><TableHead className="w-24 text-center">金额</TableHead>
-              <TableHead className="w-24 text-center">余额</TableHead><TableHead className="w-20 text-center">方式</TableHead>
-              <TableHead className="w-20 text-center">操作员</TableHead><TableHead className="w-[80px] text-center">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {list.length === 0 ? (
-              <TableRow><TableCell colSpan={12} className="h-16 text-center text-muted-foreground">暂无充值记录，点击「导入」批量导入</TableCell></TableRow>
-            ) : list.map((r, idx) => (
-              <TableRow key={r.id}>
-                <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
-                <TableCell className="font-medium text-center">{r.user_name}</TableCell>
-                <TableCell className="text-center">{r.user_department || '-'}</TableCell>
-                <TableCell className="text-center">{r.user_id || '-'}</TableCell>
-                <TableCell className="text-center">{r.card_no || '-'}</TableCell>
-                <TableCell className="text-center">{r.external_sn || '-'}</TableCell>
-                <TableCell className="text-center">{r.recharge_date || '-'}</TableCell>
-                <TableCell className="font-medium text-green-600 text-center">{fmt(r.amount)}</TableCell>
-                <TableCell className="text-center">{r.balance_recorded != null ? fmt(r.balance_recorded) : '-'}</TableCell>
-                <TableCell className="text-center">{r.payment_method || '现金'}</TableCell>
-                <TableCell className="text-center">{r.operator || '-'}</TableCell>
-                <TableCell className="text-center">
-                  <Button variant="ghost" size="icon" onClick={() => setConfirm({ open: true, target: r })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {total > limit && (
-          <div className="flex justify-center gap-2">
-            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
-            <span className="text-xs text-muted-foreground self-center">{page} / {Math.ceil(total / limit)}</span>
-            <Button size="sm" variant="outline" disabled={page >= Math.ceil(total / limit)} onClick={() => setPage(page + 1)}>下一页</Button>
-          </div>
-        )}
+        <div ref={scrollRef} className="relative overflow-y-auto max-h-[45vh] rounded-md border" onScroll={(e) => {
+          const el = e.currentTarget;
+          if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) loadMore();
+        }}>
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-100">
+              <tr className="border-b">
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap w-12">序号</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">姓名</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">部门</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">工号</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">卡号</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">流水号</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">充值日期</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">金额</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">余额</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">方式</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">操作员</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length === 0 ? (
+                <tr><td colSpan={12} className="h-16 text-center text-muted-foreground text-sm">暂无充值记录，点击「导入」批量导入</td></tr>
+              ) : list.map((r, idx) => (
+                <tr key={r.id} className="border-b hover:bg-muted/50">
+                  <td className="px-2 py-1.5 text-center text-muted-foreground">{idx + 1}</td>
+                  <td className="px-2 py-1.5 text-center font-medium">{r.user_name}</td>
+                  <td className="px-2 py-1.5 text-center">{r.user_department || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.user_id || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.card_no || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.external_sn || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.recharge_date || '-'}</td>
+                  <td className="px-2 py-1.5 text-center font-medium text-green-600">{fmt(r.amount)}</td>
+                  <td className="px-2 py-1.5 text-center">{r.balance_recorded != null ? fmt(r.balance_recorded) : '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.payment_method || '现金'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.operator || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">
+                    <Button variant="ghost" size="icon" onClick={() => setConfirm({ open: true, target: r })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {loadingMore && <div className="py-2 text-center text-xs text-muted-foreground">加载中…</div>}
+          {!loadingMore && list.length >= total && list.length > 0 && <div className="py-2 text-center text-xs text-muted-foreground">已加载全部 {total} 条</div>}
+        </div>
       </CardContent>
 
       {/* 导入弹窗 */}

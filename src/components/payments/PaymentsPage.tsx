@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,16 +76,37 @@ export default function PaymentsPage() {
   const amountCn = amountToCn(form.amount);
 
   // ========== Load list ==========
-  const load = useCallback(async () => {
+  const [listPage, setListPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const load = useCallback(async (reset = true) => {
     setLoading(true);
     try {
-      const r = await paymentRequestsApi.list({ limit: 50 });
-      setItems(r.items);
+      const p = reset ? 1 : listPage;
+      const r = await paymentRequestsApi.list({ limit: 50, page: p });
+      setItems(reset ? r.items : (prev) => [...prev, ...r.items]);
+      setHasMore(r.items.length >= 50);
+      if (reset) setListPage(2);
+      else setListPage(p + 1);
+      if (reset && scrollRef.current) scrollRef.current.scrollTop = 0;
     } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
     finally { setLoading(false); }
-  }, []);
+  }, [listPage]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(true); }, []);
+
+  const loadMore = async () => {
+    if (loadingMore || loading || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const r = await paymentRequestsApi.list({ limit: 50, page: listPage });
+      setItems((prev) => [...prev, ...r.items]);
+      setHasMore(r.items.length >= 50);
+      setListPage(listPage + 1);
+    } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
+    finally { setLoadingMore(false); }
+  };
 
   // ========== Supplier auto-fill ==========
   const handlePayeeChange = (value: string) => {
@@ -448,48 +469,55 @@ ${attachHtml}
 
       <Card>
         <CardContent className="p-0">
-          <Table className="max-h-[65vh]">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10 text-center text-xs">序号</TableHead>
-                <TableHead className="text-xs">单号</TableHead>
-                <TableHead className="w-24 text-xs">申请日期</TableHead>
-                <TableHead className="text-xs">请款内容</TableHead>
-                <TableHead className="text-xs">收款人</TableHead>
-                <TableHead className="w-24 text-xs">金额</TableHead>
-                <TableHead className="w-20 text-center text-xs">状态</TableHead>
-                <TableHead className="w-24 text-xs">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={8} className="h-24 text-center text-sm text-muted-foreground">加载中...</TableCell></TableRow>
-              ) : items.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="h-24 text-center text-sm text-muted-foreground">暂无请款单</TableCell></TableRow>
-              ) : items.map((p, idx) => (
-                <TableRow key={p.id}>
-                  <TableCell className="text-center text-xs text-muted-foreground">{idx + 1}</TableCell>
-                  <TableCell className="font-mono text-xs font-medium">{p.request_no}</TableCell>
-                  <TableCell className="text-xs">{formatShortDate(p.request_date)}</TableCell>
-                  <TableCell className="text-xs truncate max-w-[200px]">{p.content || '-'}</TableCell>
-                  <TableCell className="text-xs">{p.payee || '-'}</TableCell>
-                  <TableCell className="font-mono text-sm font-bold">¥{Number(p.amount).toFixed(2)}</TableCell>
-                  <TableCell className="text-center">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${p.status === 'submitted' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {p.status === 'submitted' ? '已提交' : '草稿'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex justify-center gap-0.5">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openView(p.id)} title="查看"><Eye className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(p.id)} title="编辑"><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => handleDelete(p.id, p.request_no)} title="删除"><Trash2 className="h-3.5 w-3.5" /></Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div ref={scrollRef} className="relative overflow-y-auto max-h-[65vh] rounded-md border" onScroll={(e) => {
+            const el = e.currentTarget;
+            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) loadMore();
+          }}>
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-slate-100">
+                <tr className="border-b">
+                  <th className="px-2 py-2 text-center font-medium whitespace-nowrap w-10 text-xs">序号</th>
+                  <th className="px-2 py-2 text-center font-medium whitespace-nowrap text-xs">单号</th>
+                  <th className="px-2 py-2 text-center font-medium whitespace-nowrap text-xs">申请日期</th>
+                  <th className="px-2 py-2 text-center font-medium whitespace-nowrap text-xs">请款内容</th>
+                  <th className="px-2 py-2 text-center font-medium whitespace-nowrap text-xs">收款人</th>
+                  <th className="px-2 py-2 text-center font-medium whitespace-nowrap text-xs">金额</th>
+                  <th className="px-2 py-2 text-center font-medium whitespace-nowrap text-xs">状态</th>
+                  <th className="px-2 py-2 text-center font-medium whitespace-nowrap text-xs">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={8} className="h-24 text-center text-sm text-muted-foreground">加载中...</td></tr>
+                ) : items.length === 0 ? (
+                  <tr><td colSpan={8} className="h-24 text-center text-sm text-muted-foreground">暂无请款单</td></tr>
+                ) : items.map((p, idx) => (
+                  <tr key={p.id} className="border-b hover:bg-muted/50">
+                    <td className="px-2 py-1.5 text-center text-xs text-muted-foreground">{idx + 1}</td>
+                    <td className="px-2 py-1.5 text-center font-mono text-xs font-medium">{p.request_no}</td>
+                    <td className="px-2 py-1.5 text-center text-xs">{formatShortDate(p.request_date)}</td>
+                    <td className="px-2 py-1.5 text-center text-xs truncate max-w-[200px]">{p.content || '-'}</td>
+                    <td className="px-2 py-1.5 text-center text-xs">{p.payee || '-'}</td>
+                    <td className="px-2 py-1.5 text-center font-mono text-sm font-bold">¥{Number(p.amount).toFixed(2)}</td>
+                    <td className="px-2 py-1.5 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${p.status === 'submitted' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {p.status === 'submitted' ? '已提交' : '草稿'}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <div className="flex justify-center gap-0.5">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openView(p.id)} title="查看"><Eye className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(p.id)} title="编辑"><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => handleDelete(p.id, p.request_no)} title="删除"><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {loadingMore && <div className="py-2 text-center text-xs text-muted-foreground">加载中…</div>}
+            {!loadingMore && !hasMore && items.length > 0 && <div className="py-2 text-center text-xs text-muted-foreground">已加载全部 {items.length} 条</div>}
+          </div>
         </CardContent>
       </Card>
 

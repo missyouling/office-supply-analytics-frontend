@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,9 @@ function PurchasePanel() {
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const limit = 20;
+  const [loadingMore, setLoadingMore] = useState(false);
+  const limit = 50;
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // 新建/编辑采购单
   const [open, setOpen] = useState(false);
@@ -40,12 +42,26 @@ function PurchasePanel() {
   const [viewDetail, setViewDetail] = useState<any>(null);
 
   const load = useCallback(async () => {
+    setPage(1);
     try {
-      const r = await canteenApi.purchases.list({ page, limit });
+      const r = await canteenApi.purchases.list({ page: 1, limit });
       setList(r.items); setTotal(r.total);
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
     } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
-  }, [page]);
+  }, []);
   useEffect(() => { load(); }, [load]);
+
+  // 滚动加载更多
+  const loadMore = async () => {
+    if (loadingMore || list.length >= total) return;
+    setLoadingMore(true);
+    try {
+      const next = page + 1;
+      const r = await canteenApi.purchases.list({ page: next, limit });
+      setList((prev) => [...prev, ...r.items]); setTotal(r.total); setPage(next);
+    } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
+    finally { setLoadingMore(false); }
+  };
 
   const loadSupplies = useCallback(async (kw = '') => {
     try { setSupplies((await canteenApi.supplies.list({ keyword: kw, page: 1, limit: 30 })).items); }
@@ -199,43 +215,47 @@ ${rows}
             <Button size="sm" onClick={openNew}><Plus className="mr-1 h-4 w-4" />新建</Button>
           </div>
         </div>
-        <Table className="max-h-[50vh]">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="text-center">采购单号</TableHead>
-              <TableHead className="w-28 text-center">日期</TableHead><TableHead className="text-center">供应商</TableHead>
-              <TableHead className="w-20 text-center">明细</TableHead><TableHead className="w-24 text-center">总金额</TableHead>
-              <TableHead className="w-24 text-center">实支</TableHead><TableHead className="w-[110px] text-center">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {list.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="h-16 text-center text-muted-foreground">暂无采购单</TableCell></TableRow>
-            ) : list.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell className="text-center text-muted-foreground">{p.id}</TableCell>
-                <TableCell className="font-medium text-center">{p.order_no}</TableCell>
-                <TableCell className="text-center">{p.purchase_date}</TableCell>
-                <TableCell className="text-center">{p.supplier_name || '-'}</TableCell>
-                <TableCell className="text-center">{p.item_count} 项</TableCell>
-                <TableCell className="font-medium text-center">{fmt(p.total_amount)}</TableCell>
-                <TableCell className="text-center">{p.actual_pay ? fmt(p.actual_pay) : '-'}</TableCell>
-                <TableCell className="text-center">
-                  <Button variant="ghost" size="icon" title="查看" onClick={() => viewPurchase(p)}><Eye className="h-4 w-4 text-blue-600" /></Button>
-                  <Button variant="ghost" size="icon" title="编辑" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" title="删除" onClick={() => setConfirm({ open: true, target: p })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {total > limit && (
-          <div className="flex justify-center gap-2">
-            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
-            <span className="text-xs text-muted-foreground self-center">{page} / {Math.ceil(total / limit)}</span>
-            <Button size="sm" variant="outline" disabled={page >= Math.ceil(total / limit)} onClick={() => setPage(page + 1)}>下一页</Button>
-          </div>
-        )}
+        <div ref={scrollRef} className="relative overflow-y-auto max-h-[50vh] rounded-md border" onScroll={(e) => {
+          const el = e.currentTarget;
+          if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) loadMore();
+        }}>
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-100">
+              <tr className="border-b">
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap w-12">序号</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">采购单号</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">日期</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">供应商</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">明细</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">总金额</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">实支</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length === 0 ? (
+                <tr><td colSpan={8} className="h-16 text-center text-muted-foreground text-sm">暂无采购单</td></tr>
+              ) : list.map((p) => (
+                <tr key={p.id} className="border-b hover:bg-muted/50">
+                  <td className="px-2 py-1.5 text-center text-muted-foreground">{p.id}</td>
+                  <td className="px-2 py-1.5 text-center font-medium">{p.order_no}</td>
+                  <td className="px-2 py-1.5 text-center">{p.purchase_date}</td>
+                  <td className="px-2 py-1.5 text-center">{p.supplier_name || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{p.item_count} 项</td>
+                  <td className="px-2 py-1.5 text-center font-medium">{fmt(p.total_amount)}</td>
+                  <td className="px-2 py-1.5 text-center">{p.actual_pay ? fmt(p.actual_pay) : '-'}</td>
+                  <td className="px-2 py-1.5 text-center">
+                    <Button variant="ghost" size="icon" title="查看" onClick={() => viewPurchase(p)}><Eye className="h-4 w-4 text-blue-600" /></Button>
+                    <Button variant="ghost" size="icon" title="编辑" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" title="删除" onClick={() => setConfirm({ open: true, target: p })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {loadingMore && <div className="py-2 text-center text-xs text-muted-foreground">加载中…</div>}
+          {!loadingMore && list.length >= total && list.length > 0 && <div className="py-2 text-center text-xs text-muted-foreground">已加载全部 {total} 条</div>}
+        </div>
       </CardContent>
 
       {/* 采购单编辑弹窗 */}
