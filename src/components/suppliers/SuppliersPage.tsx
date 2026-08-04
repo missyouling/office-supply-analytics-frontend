@@ -62,7 +62,7 @@ export default function SuppliersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>名称</TableHead><TableHead>联系人</TableHead><TableHead>电话</TableHead><TableHead>开户行</TableHead><TableHead>账号</TableHead>
-                <TableHead>备注</TableHead><TableHead className="w-28 text-right">操作</TableHead>
+                <TableHead>备注</TableHead><TableHead className="w-28 text-center">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -83,7 +83,7 @@ export default function SuppliersPage() {
                   <TableCell className="text-xs">{s.bank_name || '-'}</TableCell>
                   <TableCell className="text-xs font-mono">{s.bank_account || '-'}</TableCell>
                   <TableCell className="text-muted-foreground text-xs truncate max-w-[150px]">{s.remark || '-'}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-center">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(s)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                   </TableCell>

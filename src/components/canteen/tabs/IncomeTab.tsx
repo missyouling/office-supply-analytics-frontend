@@ -253,12 +253,12 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
         <Table className="max-h-[45vh]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28">日期</TableHead>
-              <TableHead className="w-20">早餐(次)</TableHead><TableHead className="w-24">早餐(元)</TableHead>
-              <TableHead className="w-20">午餐(次)</TableHead><TableHead className="w-24">午餐(元)</TableHead>
-              <TableHead className="w-20">晚餐(次)</TableHead><TableHead className="w-24">晚餐(元)</TableHead>
-              <TableHead className="w-24">总人次</TableHead><TableHead className="w-24">总收入</TableHead>
-              <TableHead className="w-[150px] text-center">操作</TableHead>
+              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28 text-center">日期</TableHead>
+              <TableHead className="w-20 text-center">早餐(次)</TableHead><TableHead className="w-24 text-center">早餐(元)</TableHead>
+              <TableHead className="w-20 text-center">午餐(次)</TableHead><TableHead className="w-24 text-center">午餐(元)</TableHead>
+              <TableHead className="w-20 text-center">晚餐(次)</TableHead><TableHead className="w-24 text-center">晚餐(元)</TableHead>
+              <TableHead className="w-24 text-center">总人次</TableHead><TableHead className="w-24 text-center">总收入</TableHead>
+              <TableHead className="w-[110px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -267,18 +267,17 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
             ) : list.map((d) => (
               <TableRow key={d.id}>
                 <TableCell className="text-center text-muted-foreground">{d.id}</TableCell>
-                <TableCell>{d.income_date}</TableCell>
-                <TableCell>{d.breakfast_count}</TableCell>
-                <TableCell className="text-right">{fmt(d.breakfast_amount)}</TableCell>
-                <TableCell>{d.lunch_count}</TableCell>
-                <TableCell className="text-right">{fmt(d.lunch_amount)}</TableCell>
-                <TableCell>{d.dinner_count}</TableCell>
-                <TableCell className="text-right">{fmt(d.dinner_amount)}</TableCell>
+                <TableCell className="text-center">{d.income_date}</TableCell>
+                <TableCell className="text-center">{d.breakfast_count}</TableCell>
+                <TableCell className="text-center">{fmt(d.breakfast_amount)}</TableCell>
+                <TableCell className="text-center">{d.lunch_count}</TableCell>
+                <TableCell className="text-center">{fmt(d.lunch_amount)}</TableCell>
+                <TableCell className="text-center">{d.dinner_count}</TableCell>
+                <TableCell className="text-center">{fmt(d.dinner_amount)}</TableCell>
                 <TableCell className="text-center">{(d.lunch_count || 0) + (d.dinner_count || 0)}</TableCell>
-                <TableCell className="text-right font-medium text-red-600">{fmt(d.total_amount)}</TableCell>
+                <TableCell className="font-medium text-red-600 text-center">{fmt(d.total_amount)}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" title="查看" onClick={() => viewIncome(d)}><Eye className="h-4 w-4 text-blue-600" /></Button>
-                  <Button variant="ghost" size="icon" title="打印" onClick={() => printIncome(d)}><Printer className="h-4 w-4 text-green-600" /></Button>
                   <Button variant="ghost" size="icon" title="编辑" onClick={() => openEdit(d)}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" title="删除" onClick={() => setConfirm({ open: true, target: d })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                 </TableCell>
@@ -385,13 +384,13 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>餐别</TableHead><TableHead>次数</TableHead><TableHead>金额</TableHead>
+                    <TableHead className="text-center">餐别</TableHead><TableHead className="text-center">次数</TableHead><TableHead className="text-center">金额</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow><TableCell>早餐</TableCell><TableCell>{viewItem.breakfast_count}</TableCell><TableCell className="text-right">{fmt(viewItem.breakfast_amount)}</TableCell></TableRow>
-                  <TableRow><TableCell>午餐</TableCell><TableCell>{viewItem.lunch_count}</TableCell><TableCell className="text-right">{fmt(viewItem.lunch_amount)}</TableCell></TableRow>
-                  <TableRow><TableCell>晚餐</TableCell><TableCell>{viewItem.dinner_count}</TableCell><TableCell className="text-right">{fmt(viewItem.dinner_amount)}</TableCell></TableRow>
+                  <TableRow><TableCell className="text-center">早餐</TableCell><TableCell className="text-center">{viewItem.breakfast_count}</TableCell><TableCell className="text-center">{fmt(viewItem.breakfast_amount)}</TableCell></TableRow>
+                  <TableRow><TableCell className="text-center">午餐</TableCell><TableCell className="text-center">{viewItem.lunch_count}</TableCell><TableCell className="text-center">{fmt(viewItem.lunch_amount)}</TableCell></TableRow>
+                  <TableRow><TableCell className="text-center">晚餐</TableCell><TableCell className="text-center">{viewItem.dinner_count}</TableCell><TableCell className="text-center">{fmt(viewItem.dinner_amount)}</TableCell></TableRow>
                 </TableBody>
               </Table>
               <div className="flex items-center justify-between pt-2 border-t">
@@ -521,10 +520,10 @@ tr.even td{background:#f8fafc}
         <Table className="max-h-[45vh]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28">收取日期</TableHead>
-              <TableHead className="w-20">餐别</TableHead><TableHead className="w-24">金额</TableHead>
-              <TableHead className="w-24">缴费个人</TableHead><TableHead className="w-32">理由</TableHead>
-              <TableHead className="w-24">经办人</TableHead><TableHead>备注</TableHead>
+              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28 text-center">收取日期</TableHead>
+              <TableHead className="w-20 text-center">餐别</TableHead><TableHead className="w-24 text-center">金额</TableHead>
+              <TableHead className="w-24 text-center">缴费个人</TableHead><TableHead className="w-32 text-center">理由</TableHead>
+              <TableHead className="w-24 text-center">经办人</TableHead><TableHead className="text-center">备注</TableHead>
               <TableHead className="w-[100px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -534,12 +533,12 @@ tr.even td{background:#f8fafc}
             ) : list.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="text-center text-muted-foreground">{r.id}</TableCell>
-                <TableCell>{r.fee_date}</TableCell>
-                <TableCell>{r.meal_type}</TableCell>
-                <TableCell className="text-right font-medium text-orange-600">{fmt(r.amount)}</TableCell>
-                <TableCell>{r.payer}</TableCell>
-                <TableCell>{r.reason || '-'}</TableCell>
-                <TableCell>{r.handler || '-'}</TableCell>
+                <TableCell className="text-center">{r.fee_date}</TableCell>
+                <TableCell className="text-center">{r.meal_type}</TableCell>
+                <TableCell className="font-medium text-orange-600 text-center">{fmt(r.amount)}</TableCell>
+                <TableCell className="text-center">{r.payer}</TableCell>
+                <TableCell className="text-center">{r.reason || '-'}</TableCell>
+                <TableCell className="text-center">{r.handler || '-'}</TableCell>
                 <TableCell className="text-center max-w-[150px] truncate">{r.remark || '-'}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" onClick={() => { setEdit(r); setForm({ fee_date: r.fee_date, meal_type: r.meal_type, amount: r.amount, payer: r.payer, reason: r.reason || FEE_REASONS[0], remark: r.remark || '', handler: r.handler || '' }); setOpen(true); }}>
@@ -744,12 +743,12 @@ function RechargePanel() {
         <Table className="max-h-[45vh]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead>姓名</TableHead>
-              <TableHead className="w-24">工号</TableHead><TableHead className="w-24">卡号</TableHead>
-              <TableHead className="w-20">流水号</TableHead><TableHead className="w-28">充值日期</TableHead>
-              <TableHead className="w-24">金额</TableHead><TableHead className="w-24">余额</TableHead>
-              <TableHead className="w-24">方式</TableHead><TableHead className="w-20">操作员</TableHead>
-              <TableHead className="w-20">部门</TableHead><TableHead className="w-[80px] text-center">操作</TableHead>
+              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-20 text-center">姓名</TableHead>
+              <TableHead className="w-24 text-center">部门</TableHead><TableHead className="w-20 text-center">工号</TableHead>
+              <TableHead className="w-24 text-center">卡号</TableHead><TableHead className="w-24 text-center">流水号</TableHead>
+              <TableHead className="w-28 text-center">充值日期</TableHead><TableHead className="w-24 text-center">金额</TableHead>
+              <TableHead className="w-24 text-center">余额</TableHead><TableHead className="w-20 text-center">方式</TableHead>
+              <TableHead className="w-20 text-center">操作员</TableHead><TableHead className="w-[80px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -758,16 +757,16 @@ function RechargePanel() {
             ) : list.map((r, idx) => (
               <TableRow key={r.id}>
                 <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
-                <TableCell className="font-medium">{r.user_name}</TableCell>
-                <TableCell>{r.user_id || '-'}</TableCell>
-                <TableCell>{r.card_no || '-'}</TableCell>
-                <TableCell>{r.external_sn || '-'}</TableCell>
-                <TableCell>{r.recharge_date || '-'}</TableCell>
-                <TableCell className="text-right font-medium text-green-600">{fmt(r.amount)}</TableCell>
-                <TableCell className="text-right">{r.balance_recorded != null ? fmt(r.balance_recorded) : '-'}</TableCell>
-                <TableCell>{r.payment_method || '现金'}</TableCell>
-                <TableCell>{r.operator || '-'}</TableCell>
-                <TableCell className="max-w-[80px] truncate">{r.user_department || '-'}</TableCell>
+                <TableCell className="font-medium text-center">{r.user_name}</TableCell>
+                <TableCell className="text-center">{r.user_department || '-'}</TableCell>
+                <TableCell className="text-center">{r.user_id || '-'}</TableCell>
+                <TableCell className="text-center">{r.card_no || '-'}</TableCell>
+                <TableCell className="text-center">{r.external_sn || '-'}</TableCell>
+                <TableCell className="text-center">{r.recharge_date || '-'}</TableCell>
+                <TableCell className="font-medium text-green-600 text-center">{fmt(r.amount)}</TableCell>
+                <TableCell className="text-center">{r.balance_recorded != null ? fmt(r.balance_recorded) : '-'}</TableCell>
+                <TableCell className="text-center">{r.payment_method || '现金'}</TableCell>
+                <TableCell className="text-center">{r.operator || '-'}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" onClick={() => setConfirm({ open: true, target: r })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                 </TableCell>
@@ -802,7 +801,7 @@ function RechargePanel() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="bg-slate-100">
-                        {csvHeaders.map((h, i) => <th key={i} className="px-2 py-1 whitespace-nowrap text-left">{h}</th>)}
+                        {csvHeaders.map((h, i) => <th key={i} className="px-2 py-1 whitespace-nowrap text-center">{h}</th>)}
                       </tr>
                     </thead>
                     <tbody>

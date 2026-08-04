@@ -62,9 +62,9 @@ export default function PriceAnomalyTable({ priceAnomalies }: Props) {
                 <TableHead>品名</TableHead>
                 <TableHead>规格</TableHead>
                 <TableHead>分类</TableHead>
-                <TableHead className="text-right">上次单价</TableHead>
-                <TableHead className="text-right">前次单价</TableHead>
-                <TableHead className="text-right">价差</TableHead>
+                <TableHead>上次单价</TableHead>
+                <TableHead>前次单价</TableHead>
+                <TableHead>价差</TableHead>
                 <TableHead>采购日期</TableHead>
               </TableRow>
             </TableHeader>
@@ -82,9 +82,9 @@ export default function PriceAnomalyTable({ priceAnomalies }: Props) {
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{a.spec}</TableCell>
                     <TableCell><Badge variant="secondary" className="text-xs">{a.category}</Badge></TableCell>
-                    <TableCell className="text-right font-mono text-red-600 font-medium">¥{a.lastUnitPrice.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">¥{a.prevUnitPrice.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="font-mono text-red-600 font-medium">¥{a.lastUnitPrice.toFixed(2)}</TableCell>
+                    <TableCell className="font-mono">¥{a.prevUnitPrice.toFixed(2)}</TableCell>
+                    <TableCell className="text-center">
                       <span className={`font-mono font-bold ${
                         a.changePercent > 0 ? 'text-red-600' : 'text-green-600'
                       }`}>

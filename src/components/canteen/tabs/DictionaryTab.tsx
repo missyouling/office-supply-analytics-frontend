@@ -97,7 +97,7 @@ function CategoryPanel() {
         <Table className="max-h-[50vh]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead>名称</TableHead>
+              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="text-center">名称</TableHead>
               <TableHead className="text-center w-20">排序</TableHead><TableHead className="w-[100px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -107,7 +107,7 @@ function CategoryPanel() {
             ) : cats.map((c) => (
               <TableRow key={c.id}>
                 <TableCell className="text-center text-muted-foreground">{c.id}</TableCell>
-                <TableCell className="font-medium">{c.name}</TableCell>
+                <TableCell className="font-medium text-center">{c.name}</TableCell>
                 <TableCell className="text-center">{c.sort_order}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" onClick={() => { setEdit(c); setForm({ name: c.name, sort_order: c.sort_order }); setOpen(true); }}>
@@ -187,9 +187,9 @@ function SupplyPanel() {
         <Table className="max-h-[50vh]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead>品名</TableHead>
-              <TableHead>规格</TableHead><TableHead className="w-16">单位</TableHead>
-              <TableHead className="w-24">参考单价</TableHead><TableHead className="w-24">分类</TableHead>
+              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="text-center">品名</TableHead>
+              <TableHead className="text-center">规格</TableHead><TableHead className="w-16 text-center">单位</TableHead>
+              <TableHead className="w-24 text-center">参考单价</TableHead><TableHead className="w-24 text-center">分类</TableHead>
               <TableHead className="w-[100px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -199,11 +199,11 @@ function SupplyPanel() {
             ) : items.map((s) => (
               <TableRow key={s.id}>
                 <TableCell className="text-center text-muted-foreground">{s.id}</TableCell>
-                <TableCell className="font-medium">{s.name}</TableCell>
-                <TableCell>{s.spec || '-'}</TableCell>
-                <TableCell>{s.unit}</TableCell>
-                <TableCell>¥{Number(s.reference_price).toFixed(2)}</TableCell>
-                <TableCell>{s.category_name || '-'}</TableCell>
+                <TableCell className="font-medium text-center">{s.name}</TableCell>
+                <TableCell className="text-center">{s.spec || '-'}</TableCell>
+                <TableCell className="text-center">{s.unit}</TableCell>
+                <TableCell className="text-center">¥{Number(s.reference_price).toFixed(2)}</TableCell>
+                <TableCell className="text-center">{s.category_name || '-'}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" onClick={() => { setEdit(s); setForm({ name: s.name, spec: s.spec || '', unit: s.unit, reference_price: s.reference_price, category_id: s.category_id || '', remark: s.remark || '' }); setOpen(true); }}>
                     <Pencil className="h-4 w-4" />
@@ -290,7 +290,7 @@ function ExpenseCategoryPanel() {
         <Table className="max-h-[40vh]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead>名称</TableHead>
+              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="text-center">名称</TableHead>
               <TableHead className="text-center w-20">排序</TableHead><TableHead className="w-[100px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -300,7 +300,7 @@ function ExpenseCategoryPanel() {
             ) : cats.map((c) => (
               <TableRow key={c.id}>
                 <TableCell className="text-center text-muted-foreground">{c.id}</TableCell>
-                <TableCell className="font-medium">{c.name}</TableCell>
+                <TableCell className="font-medium text-center">{c.name}</TableCell>
                 <TableCell className="text-center">{c.sort_order}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" onClick={() => { setEdit(c); setForm({ name: c.name, sort_order: c.sort_order }); setOpen(true); }}>

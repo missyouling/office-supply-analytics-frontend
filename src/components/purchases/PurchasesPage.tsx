@@ -406,7 +406,7 @@ tr:nth-child(even) td{background:#f8fafc}
                   <TableHead className="w-28 text-center text-xs">单价</TableHead>
                   <TableHead className="w-28 text-center text-xs">数量</TableHead>
                   <TableHead className="w-36 text-center text-xs">日期</TableHead>
-                  <TableHead className="w-24 text-right text-xs">小计</TableHead>
+                  <TableHead className="w-24 text-xs">小计</TableHead>
                   <TableHead className="w-8"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -438,7 +438,7 @@ tr:nth-child(even) td{background:#f8fafc}
                       <input type="date" className="h-7 w-32 rounded border border-input bg-background px-1 text-xs font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         value={item.date} onChange={e => updateDate(idx, e.target.value)} />
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm font-medium">¥{item.subtotal.toFixed(2)}</TableCell>
+                    <TableCell className="font-mono text-sm font-medium">¥{item.subtotal.toFixed(2)}</TableCell>
                     <TableCell><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeItem(idx)}><X className="h-3 w-3 text-red-500" /></Button></TableCell>
                   </TableRow>
                 ))}
@@ -512,7 +512,7 @@ tr:nth-child(even) td{background:#f8fafc}
                     <TableHead className="w-28 text-center text-xs">单价</TableHead>
                     <TableHead className="w-28 text-center text-xs">数量</TableHead>
                     <TableHead className="w-36 text-center text-xs">日期</TableHead>
-                    <TableHead className="w-24 text-right text-xs">小计</TableHead>
+                    <TableHead className="w-24 text-xs">小计</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -522,13 +522,13 @@ tr:nth-child(even) td{background:#f8fafc}
                       <TableCell className="text-sm font-medium">{item.supply_name}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{item.supply_spec || '-'}</TableCell>
                       <TableCell className="text-center text-xs">{item.unit || '-'}</TableCell>
-                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                      <TableCell className="font-mono text-xs text-muted-foreground">
                         {item.reference_price ? `¥${Number(item.reference_price).toFixed(2)}` : '-'}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">¥{Number(item.unit_price).toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-mono text-xs">{item.quantity}</TableCell>
+                      <TableCell className="font-mono text-xs">¥{Number(item.unit_price).toFixed(2)}</TableCell>
+                      <TableCell className="font-mono text-xs">{item.quantity}</TableCell>
                       <TableCell className="text-center font-mono text-xs">{item.date ? formatShortDate(item.date) : '-'}</TableCell>
-                      <TableCell className="text-right font-mono text-sm font-medium">¥{Number(item.subtotal).toFixed(2)}</TableCell>
+                      <TableCell className="font-mono text-sm font-medium">¥{Number(item.subtotal).toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -597,11 +597,11 @@ tr:nth-child(even) td{background:#f8fafc}
                 <TableHead className="w-36 text-xs">日期范围</TableHead>
                 <TableHead className="w-12 text-center text-xs">品项</TableHead>
                 <TableHead className="w-auto text-xs">供应商</TableHead>
-                <TableHead className="w-24 text-right text-xs">金额</TableHead>
+                <TableHead className="w-24 text-xs">金额</TableHead>
                 <TableHead className="w-20 text-center text-xs">付款状态</TableHead>
                 <TableHead className="w-24 text-xs">付款日期</TableHead>
                 <TableHead className="w-auto text-xs">备注</TableHead>
-                <TableHead className="w-14 text-right text-xs">操作</TableHead>
+                <TableHead className="w-14 text-xs">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -617,7 +617,7 @@ tr:nth-child(even) td{background:#f8fafc}
                     {p.item_count || 0} 项
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{p.supplier_name || '-'}</TableCell>
-                  <TableCell className="text-right font-mono text-sm font-bold">{formatCurrency(p.total_amount)}</TableCell>
+                  <TableCell className="font-mono text-sm font-bold">{formatCurrency(p.total_amount)}</TableCell>
                   <TableCell className="text-center">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${p.payment_status === '已付款' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                       {p.payment_status || '未付款'}
@@ -625,7 +625,7 @@ tr:nth-child(even) td{background:#f8fafc}
                   </TableCell>
                   <TableCell className="text-xs">{p.payment_date ? formatPurchaseDate(p.payment_date) : '-'}</TableCell>
                   <TableCell className="text-xs text-muted-foreground truncate max-w-[120px]">{p.remark || '-'}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-center">
                     <Popover open={menuOpenId === p.id} onOpenChange={(open) => setMenuOpenId(open ? p.id : null)}>
                       <PopoverTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-7 w-7" title="更多">

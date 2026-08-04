@@ -124,8 +124,8 @@ export default function CostPieChart({ categoryStats, topSupplies }: Props) {
               <TableRow>
                 <TableHead>品名</TableHead>
                 <TableHead>规格</TableHead>
-                <TableHead className="text-right">数量</TableHead>
-                <TableHead className="text-right">金额</TableHead>
+                <TableHead>数量</TableHead>
+                <TableHead>金额</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -135,8 +135,8 @@ export default function CostPieChart({ categoryStats, topSupplies }: Props) {
                 <TableRow key={s.id}>
                   <TableCell className="font-medium">{s.name}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{s.spec}</TableCell>
-                  <TableCell className="text-right">{s.totalQuantity}</TableCell>
-                  <TableCell className="text-right font-mono">¥{s.totalAmount.toFixed(2)}</TableCell>
+                  <TableCell>{s.totalQuantity}</TableCell>
+                  <TableCell className="font-mono">¥{s.totalAmount.toFixed(2)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

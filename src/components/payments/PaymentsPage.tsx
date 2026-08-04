@@ -456,9 +456,9 @@ ${attachHtml}
                 <TableHead className="w-24 text-xs">申请日期</TableHead>
                 <TableHead className="text-xs">请款内容</TableHead>
                 <TableHead className="text-xs">收款人</TableHead>
-                <TableHead className="w-24 text-right text-xs">金额</TableHead>
+                <TableHead className="w-24 text-xs">金额</TableHead>
                 <TableHead className="w-20 text-center text-xs">状态</TableHead>
-                <TableHead className="w-24 text-right text-xs">操作</TableHead>
+                <TableHead className="w-24 text-xs">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -473,14 +473,14 @@ ${attachHtml}
                   <TableCell className="text-xs">{formatShortDate(p.request_date)}</TableCell>
                   <TableCell className="text-xs truncate max-w-[200px]">{p.content || '-'}</TableCell>
                   <TableCell className="text-xs">{p.payee || '-'}</TableCell>
-                  <TableCell className="text-right font-mono text-sm font-bold">¥{Number(p.amount).toFixed(2)}</TableCell>
+                  <TableCell className="font-mono text-sm font-bold">¥{Number(p.amount).toFixed(2)}</TableCell>
                   <TableCell className="text-center">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${p.status === 'submitted' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                       {p.status === 'submitted' ? '已提交' : '草稿'}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-0.5">
+                  <TableCell className="text-center">
+                    <div className="flex justify-center gap-0.5">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openView(p.id)} title="查看"><Eye className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(p.id)} title="编辑"><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => handleDelete(p.id, p.request_no)} title="删除"><Trash2 className="h-3.5 w-3.5" /></Button>

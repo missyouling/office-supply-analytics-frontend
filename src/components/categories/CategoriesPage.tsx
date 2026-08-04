@@ -62,7 +62,7 @@ export default function CategoriesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12 text-center">序号</TableHead><TableHead>名称</TableHead>
-                <TableHead className="text-center w-20">排序</TableHead><TableHead className="text-right w-[100px]">操作</TableHead>
+                <TableHead className="text-center w-20">排序</TableHead><TableHead className="w-[100px] text-center">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -73,7 +73,7 @@ export default function CategoriesPage() {
                   <TableCell className="text-center text-muted-foreground">{c.id}</TableCell>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell className="text-center">{c.sort_order}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-center">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(c)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                   </TableCell>

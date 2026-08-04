@@ -202,10 +202,10 @@ ${rows}
         <Table className="max-h-[50vh]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead>采购单号</TableHead>
-              <TableHead className="w-28">日期</TableHead><TableHead>供应商</TableHead>
-              <TableHead className="w-20">明细</TableHead><TableHead className="w-24">总金额</TableHead>
-              <TableHead className="w-24">实支</TableHead><TableHead className="w-[110px] text-center">操作</TableHead>
+              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="text-center">采购单号</TableHead>
+              <TableHead className="w-28 text-center">日期</TableHead><TableHead className="text-center">供应商</TableHead>
+              <TableHead className="w-20 text-center">明细</TableHead><TableHead className="w-24 text-center">总金额</TableHead>
+              <TableHead className="w-24 text-center">实支</TableHead><TableHead className="w-[110px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -214,12 +214,12 @@ ${rows}
             ) : list.map((p) => (
               <TableRow key={p.id}>
                 <TableCell className="text-center text-muted-foreground">{p.id}</TableCell>
-                <TableCell className="font-medium">{p.order_no}</TableCell>
-                <TableCell>{p.purchase_date}</TableCell>
-                <TableCell>{p.supplier_name || '-'}</TableCell>
+                <TableCell className="font-medium text-center">{p.order_no}</TableCell>
+                <TableCell className="text-center">{p.purchase_date}</TableCell>
+                <TableCell className="text-center">{p.supplier_name || '-'}</TableCell>
                 <TableCell className="text-center">{p.item_count} 项</TableCell>
-                <TableCell className="text-right font-medium">{fmt(p.total_amount)}</TableCell>
-                <TableCell className="text-right">{p.actual_pay ? fmt(p.actual_pay) : '-'}</TableCell>
+                <TableCell className="font-medium text-center">{fmt(p.total_amount)}</TableCell>
+                <TableCell className="text-center">{p.actual_pay ? fmt(p.actual_pay) : '-'}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" title="查看" onClick={() => viewPurchase(p)}><Eye className="h-4 w-4 text-blue-600" /></Button>
                   <Button variant="ghost" size="icon" title="编辑" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
@@ -275,9 +275,9 @@ ${rows}
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12 text-center">序号</TableHead><TableHead>品名</TableHead>
-                  <TableHead className="w-20">单位</TableHead><TableHead className="w-24">数量</TableHead>
-                  <TableHead className="w-24">单价</TableHead><TableHead className="w-24">小计</TableHead>
+                  <TableHead className="w-12 text-center">序号</TableHead><TableHead className="text-center">品名</TableHead>
+                  <TableHead className="w-20 text-center">单位</TableHead><TableHead className="w-24 text-center">数量</TableHead>
+                  <TableHead className="w-24 text-center">单价</TableHead><TableHead className="w-24 text-center">小计</TableHead>
                   <TableHead className="w-14"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -287,11 +287,11 @@ ${rows}
                 ) : form.items.map((it, idx) => (
                   <TableRow key={`${it.supply_id}-${idx}`}>
                     <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
-                    <TableCell className="text-left">{it.supply_name}</TableCell>
-                    <TableCell>{it.unit}</TableCell>
-                    <TableCell><Input className="h-7 w-20 text-right" type="number" value={it.quantity} onChange={(e) => { const q = parseFloat(e.target.value) || 0; updateRow(idx, { quantity: q, subtotal: q * it.unit_price }); }} /></TableCell>
-                    <TableCell><Input className="h-7 w-20 text-right" type="number" value={it.unit_price} onChange={(e) => { const p = parseFloat(e.target.value) || 0; updateRow(idx, { unit_price: p, subtotal: it.quantity * p }); }} /></TableCell>
-                    <TableCell className="text-right font-medium">{fmt(it.subtotal)}</TableCell>
+                    <TableCell className="text-center">{it.supply_name}</TableCell>
+                    <TableCell className="text-center">{it.unit}</TableCell>
+                    <TableCell className="text-center"><Input className="h-7 w-20 text-center" type="number" value={it.quantity} onChange={(e) => { const q = parseFloat(e.target.value) || 0; updateRow(idx, { quantity: q, subtotal: q * it.unit_price }); }} /></TableCell>
+                    <TableCell className="text-center"><Input className="h-7 w-20 text-center" type="number" value={it.unit_price} onChange={(e) => { const p = parseFloat(e.target.value) || 0; updateRow(idx, { unit_price: p, subtotal: it.quantity * p }); }} /></TableCell>
+                    <TableCell className="font-medium text-center">{fmt(it.subtotal)}</TableCell>
                     <TableCell><Button variant="ghost" size="icon" onClick={() => removeRow(idx)}><X className="h-4 w-4 text-red-500" /></Button></TableCell>
                   </TableRow>
                 ))}
@@ -327,9 +327,9 @@ ${rows}
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12 text-center">序号</TableHead><TableHead>品名</TableHead>
-                      <TableHead className="w-20">单位</TableHead><TableHead className="w-24">数量</TableHead>
-                      <TableHead className="w-24">单价</TableHead><TableHead className="w-28">小计</TableHead>
+                      <TableHead className="w-12 text-center">序号</TableHead><TableHead className="text-center">品名</TableHead>
+                      <TableHead className="w-20 text-center">单位</TableHead><TableHead className="w-24 text-center">数量</TableHead>
+                      <TableHead className="w-24 text-center">单价</TableHead><TableHead className="w-28 text-center">小计</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -338,11 +338,11 @@ ${rows}
                     ) : viewDetail.items.map((it: any, idx: number) => (
                       <TableRow key={idx}>
                         <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
-                        <TableCell className="text-left">{it.supply_name || ''}</TableCell>
-                        <TableCell>{it.unit || ''}</TableCell>
-                        <TableCell className="text-right">{Number(it.quantity).toFixed(2)}</TableCell>
-                        <TableCell className="text-right">{fmt(it.unit_price)}</TableCell>
-                        <TableCell className="text-right font-medium">{fmt(it.subtotal)}</TableCell>
+                        <TableCell className="text-center">{it.supply_name || ''}</TableCell>
+                        <TableCell className="text-center">{it.unit}</TableCell>
+                        <TableCell className="text-center">{Number(it.quantity).toFixed(2)}</TableCell>
+                        <TableCell className="text-center">{fmt(it.unit_price)}</TableCell>
+                        <TableCell className="font-medium text-center">{fmt(it.subtotal)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -436,9 +436,9 @@ function ExpensePanel() {
         <Table className="max-h-[45vh]">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28">月份</TableHead>
-              <TableHead className="w-28">科目</TableHead><TableHead className="w-24">金额</TableHead>
-              <TableHead>备注</TableHead><TableHead className="w-[100px] text-center">操作</TableHead>
+              <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28 text-center">月份</TableHead>
+              <TableHead className="w-28 text-center">科目</TableHead><TableHead className="w-24 text-center">金额</TableHead>
+              <TableHead className="text-center">备注</TableHead><TableHead className="w-[100px] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -447,10 +447,10 @@ function ExpensePanel() {
             ) : list.map((e) => (
               <TableRow key={e.id}>
                 <TableCell className="text-center text-muted-foreground">{e.id}</TableCell>
-                <TableCell>{(e.expense_date || '').slice(0, 7)}</TableCell>
-                <TableCell>{e.category}</TableCell>
-                <TableCell className="text-right font-medium">{fmt(e.amount)}</TableCell>
-                <TableCell className="text-left max-w-[200px] truncate">{e.remark || '-'}</TableCell>
+                <TableCell className="text-center">{(e.expense_date || '').slice(0, 7)}</TableCell>
+                <TableCell className="text-center">{e.category}</TableCell>
+                <TableCell className="font-medium text-center">{fmt(e.amount)}</TableCell>
+                <TableCell className="text-center max-w-[200px] truncate">{e.remark || '-'}</TableCell>
                 <TableCell className="text-center">
                   <Button variant="ghost" size="icon" onClick={() => { setEdit(e); setForm({ expense_month: (e.expense_date || '').slice(0, 7), category: e.category, amount: e.amount, remark: e.remark || '' }); setOpen(true); }}>
                     <Pencil className="h-4 w-4" />

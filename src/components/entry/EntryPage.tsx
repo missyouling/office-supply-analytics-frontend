@@ -134,9 +134,9 @@ export default function EntryPage() {
               <TableRow>
                 <TableHead className="w-[140px]">品名</TableHead>
                 <TableHead className="w-[100px]">规格</TableHead>
-                <TableHead className="w-[60px] text-right">单价</TableHead>
+                <TableHead className="w-[60px]">单价</TableHead>
                 <TableHead className="w-[100px] text-center">数量</TableHead>
-                <TableHead className="w-[80px] text-right">小计</TableHead>
+                <TableHead className="w-[80px]">小计</TableHead>
                 <TableHead className="w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -153,7 +153,7 @@ export default function EntryPage() {
                   <TableRow key={item.supply_id}>
                     <TableCell className="font-medium">{item.supply_name}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">{item.supply_spec}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(item.unit_price)}</TableCell>
+                    <TableCell className="font-mono">{formatCurrency(item.unit_price)}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
                         <Button
@@ -183,7 +183,7 @@ export default function EntryPage() {
                         >+</Button>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-mono font-medium">
+                    <TableCell className="font-mono font-medium">
                       {formatCurrency(item.subtotal)}
                     </TableCell>
                     <TableCell>

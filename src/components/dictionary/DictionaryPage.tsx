@@ -158,8 +158,8 @@ export default function DictionaryPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>品名</TableHead><TableHead>规格</TableHead><TableHead>单位</TableHead>
-                  <TableHead className="text-right">参考单价</TableHead>
-                  <TableHead>分类</TableHead><TableHead>状态</TableHead><TableHead>备注</TableHead><TableHead className="text-right">操作</TableHead>
+                  <TableHead>参考单价</TableHead>
+                  <TableHead>分类</TableHead><TableHead>状态</TableHead><TableHead>备注</TableHead><TableHead>操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -175,12 +175,11 @@ export default function DictionaryPage() {
                     <TableCell className="font-medium">{s.name}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">{s.spec}</TableCell>
                     <TableCell>{s.unit}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(s.reference_price)}</TableCell>
+                    <TableCell className="font-mono">{formatCurrency(s.reference_price)}</TableCell>
                     <TableCell><Badge variant="secondary" className="text-xs">{s.category_name || '-'}</Badge></TableCell>
                     <TableCell><Badge variant={s.status === 'active' ? 'default' : 'secondary'} className="text-xs">{s.status === 'active' ? '启用' : '停用'}</Badge></TableCell>
                     <TableCell className="text-muted-foreground text-xs truncate max-w-[160px]">{s.remark || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                    <TableCell className="text-center">                      <Button variant="ghost" size="icon" onClick={() => handleEdit(s)}><Pencil className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(s.id, s.name)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                     </TableCell>
                   </TableRow>

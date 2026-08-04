@@ -284,10 +284,10 @@ export default function AnalyticsTab() {
               <Table className="max-h-[40vh]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28">日期</TableHead>
-                    <TableHead className="w-28">收入</TableHead><TableHead className="w-28">支出</TableHead>
-                    <TableHead className="w-24">采购</TableHead><TableHead className="w-28">分摊支出</TableHead>
-                    <TableHead className="w-28">盈亏</TableHead><TableHead className="w-20">人次</TableHead><TableHead className="w-24">人均</TableHead>
+                    <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28 text-center">日期</TableHead>
+                    <TableHead className="w-28 text-center">收入</TableHead><TableHead className="w-28 text-center">支出</TableHead>
+                    <TableHead className="w-24 text-center">采购</TableHead><TableHead className="w-28 text-center">分摊支出</TableHead>
+                    <TableHead className="w-28 text-center">盈亏</TableHead><TableHead className="w-20 text-center">人次</TableHead><TableHead className="w-24 text-center">人均</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -296,14 +296,14 @@ export default function AnalyticsTab() {
                   ) : dailyTable.map((r) => (
                     <TableRow key={r.序号}>
                       <TableCell className="text-center text-muted-foreground">{r.序号}</TableCell>
-                      <TableCell>{r.日期}</TableCell>
-                      <TableCell className="text-right text-green-600">{fmt(r.收入)}</TableCell>
-                      <TableCell className="text-right text-red-600">{r.支出 ? fmt(r.支出) : '-'}</TableCell>
-                      <TableCell className="text-right">{r.采购 ? fmt(r.采购) : '-'}</TableCell>
-                      <TableCell className="text-right text-amber-600">{r.分摊支出 ? fmt(r.分摊支出) : '-'}</TableCell>
-                      <TableCell className={`text-right font-medium ${r.盈亏 >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(r.盈亏)}</TableCell>
-                      <TableCell>{r.人次 || '-'}</TableCell>
-                      <TableCell>{r.人均}</TableCell>
+                      <TableCell className="text-center">{r.日期}</TableCell>
+                      <TableCell className="text-green-600 text-center">{fmt(r.收入)}</TableCell>
+                      <TableCell className="text-red-600 text-center">{r.支出 ? fmt(r.支出) : '-'}</TableCell>
+                      <TableCell className="text-center">{r.采购 ? fmt(r.采购) : '-'}</TableCell>
+                      <TableCell className="text-amber-600 text-center">{r.分摊支出 ? fmt(r.分摊支出) : '-'}</TableCell>
+                      <TableCell className={`font-medium text-center ${r.盈亏 >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(r.盈亏)}</TableCell>
+                      <TableCell className="text-center">{r.人次 || '-'}</TableCell>
+                      <TableCell className="text-center">{r.人均}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -386,9 +386,9 @@ export default function AnalyticsTab() {
                 <Table className="max-h-[40vh]">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-20">月份</TableHead><TableHead className="w-24">收入</TableHead>
-                      <TableHead className="w-24">食材</TableHead><TableHead className="w-24">其他</TableHead>
-                      <TableHead className="w-24">盈亏</TableHead><TableHead className="w-20">人次</TableHead><TableHead className="w-20">人均</TableHead>
+                      <TableHead className="w-20 text-center">月份</TableHead><TableHead className="w-24 text-center">收入</TableHead>
+                      <TableHead className="w-24 text-center">食材</TableHead><TableHead className="w-24 text-center">其他</TableHead>
+                      <TableHead className="w-24 text-center">盈亏</TableHead><TableHead className="w-20 text-center">人次</TableHead><TableHead className="w-20 text-center">人均</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -396,13 +396,13 @@ export default function AnalyticsTab() {
                       <TableRow><TableCell colSpan={7} className="h-16 text-center text-muted-foreground">暂无数据</TableCell></TableRow>
                     ) : compareData.map((c) => (
                       <TableRow key={c.month}>
-                        <TableCell>{c.month}</TableCell>
-                        <TableCell className="text-right text-green-600">{fmt(c.totalIncome)}</TableCell>
-                        <TableCell className="text-right">{fmt(c.food)}</TableCell>
-                        <TableCell className="text-right">{fmt(c.other)}</TableCell>
-                        <TableCell className={`text-right font-medium ${c.profit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(c.profit)}</TableCell>
-                        <TableCell>{c.count || '-'}</TableCell>
-                        <TableCell>{c.perCapita || '-'}</TableCell>
+                        <TableCell className="text-center">{c.month}</TableCell>
+                        <TableCell className="text-green-600 text-center">{fmt(c.totalIncome)}</TableCell>
+                        <TableCell className="text-center">{fmt(c.food)}</TableCell>
+                        <TableCell className="text-center">{fmt(c.other)}</TableCell>
+                        <TableCell className={`font-medium text-center ${c.profit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(c.profit)}</TableCell>
+                        <TableCell className="text-center">{c.count || '-'}</TableCell>
+                        <TableCell className="text-center">{c.perCapita || '-'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
