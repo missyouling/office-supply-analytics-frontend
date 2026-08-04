@@ -113,14 +113,26 @@ export default function AnalyticsTab() {
     const purchase = d.expense || 0;
     const income = d.income || 0;
     const breakfast = d.breakfast || 0;
+    const resource = d.resource || 0;
     const totalExpense = purchase + share;
-    // 人均成本 = (采购支出 + 分摊支出 - 早餐收入) / 当日消费总人次
-    const costPerCapita = d.count ? ((purchase + share - breakfast) / d.count) : 0;
+    // 人均成本 = (采购支出 + 分摊支出 - 早餐收入 - 资源占用费收入) / 当日消费总人次
+    const costPerCapita = d.count ? ((purchase + share - breakfast - resource) / d.count) : 0;
     return {
       序号: i + 1, 日期: d.date, 收入: income, 采购支出: purchase, 分摊支出: share,
       盈亏: income - totalExpense, 人次: d.count || 0, 人均成本: d.count ? costPerCapita.toFixed(2) : '-',
     };
   });
+  // 每日盈亏明细：底部每列汇总 + 整月人均成本
+  const dailySummary = (() => {
+    if (!dailyTable.length) return null;
+    const sumBill = (k: '收入' | '采购支出' | '分摊支出' | '盈亏' | '人次') => dailyTable.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+    const perDayCosts = dailyTable.map((r) => Number(r.人均成本)).filter((v) => !isNaN(v));
+    return {
+      收入: sumBill('收入'), 采购支出: sumBill('采购支出'), 分摊支出: sumBill('分摊支出'),
+      盈亏: sumBill('盈亏'), 人次: sumBill('人次'),
+      人均成本: perDayCosts.length ? (perDayCosts.reduce((a, b) => a + b, 0) / perDayCosts.length).toFixed(2) : '-',
+    };
+  })();
 
   const expensePieData = [
     { name: '食材采购', value: expenseBreakdown.food || 0 },
@@ -166,7 +178,7 @@ ${body}
 <b>计算口径：</b><br>
 收入 = 消费收入 + 资源占用费收入 + 早餐收入<br>
 支出 = 采购支出 + 分摊支出<br>
-人均成本 = (采购支出 + 分摊支出 − 早餐收入) ÷ 当日消费总人次
+人均成本 = (采购支出 + 分摊支出 − 早餐收入 − 资源占用费收入) ÷ 当日消费总人次
 </div>
 <script>setTimeout(()=>window.print(),300)</script>
 </body></html>`;
@@ -356,6 +368,18 @@ ${body}
                       <TableCell className="text-center">{r.人均成本}</TableCell>
                     </TableRow>
                   ))}
+                  {dailySummary && (
+                    <TableRow className="bg-blue-50/70 font-semibold">
+                      <TableCell className="text-center text-blue-900">合计</TableCell>
+                      <TableCell className="text-center text-blue-900">{dailyTable.length} 天</TableCell>
+                      <TableCell className="text-green-700 text-center">{fmt(dailySummary.收入)}</TableCell>
+                      <TableCell className="text-center text-blue-900">{fmt(dailySummary.采购支出)}</TableCell>
+                      <TableCell className="text-amber-700 text-center">{fmt(dailySummary.分摊支出)}</TableCell>
+                      <TableCell className={`font-semibold text-center ${dailySummary.盈亏 >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{fmt(dailySummary.盈亏)}</TableCell>
+                      <TableCell className="text-center text-blue-900">{dailySummary.人次}</TableCell>
+                      <TableCell className="text-center text-blue-900">人均 {dailySummary.人均成本}</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -365,7 +389,8 @@ ${body}
                 <p className="font-semibold mb-1">📐 计算口径</p>
                 <p>收入 = 消费收入 + 资源占用费收入 + 早餐收入</p>
                 <p>支出 = 采购支出 + 分摊支出</p>
-                <p>人均成本 = (采购支出 + 分摊支出 − 早餐收入) ÷ 当日消费总人次</p>
+                <p>人均成本 = (采购支出 + 分摊支出 − 早餐收入 − 资源占用费收入) ÷ 当日消费总人次</p>
+                <p className="text-blue-600/80 mt-1">整月人均成本 = 每日人均成本之和 ÷ 天数（表格底部「合计」行）</p>
               </div>
             </CardContent>
           </Card>

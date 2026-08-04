@@ -134,62 +134,42 @@ function PurchasePanel() {
     finally { setConfirm({ open: false, target: null }); }
   };
 
-  // 打印当前筛选范围内的所有采购单
+  // 打印当前表格内的数据行（不含明细）
   const printAll = async (onlyList = list) => {
     if (!onlyList.length) { showToast('没有可打印的采购单', '', 'destructive'); return; }
-    try {
-      const details = await Promise.all(onlyList.map((p: any) => canteenApi.purchases.get(p.id)));
-      const body = details.map((d: any) => {
-        const rows = (d.items || []).map((it: any, i: number) => `
-        <tr${i % 2 === 0 ? ' class="even"' : ''}>
-          <td>${i + 1}</td><td>${it.supply_name || ''}</td><td>${it.supply_spec || ''}</td><td>${it.unit || ''}</td>
-          <td class="num">${Number(it.unit_price).toFixed(2)}</td><td class="num">${Number(it.quantity).toFixed(2)}</td><td class="num">${Number(it.subtotal).toFixed(2)}</td>
-        </tr>`).join('');
-        return `
-        <div class="sheet">
-          <h1>🍚 食堂采购单</h1>
-          <div class="meta">
-            <span><strong>单号：</strong>${d.order_no || ''}</span>
-            <span><strong>日期：</strong>${d.purchase_date || ''}</span>
-            <span><strong>供应商：</strong>${d.supplier_name || '-'}</span>
-            <span><strong>渠道：</strong>${d.channel || '-'}</span>
-          </div>
-          <table><thead><tr><th style="width:40px">序号</th><th>品名</th><th>规格</th><th style="width:50px">单位</th><th style="width:80px">单价</th><th style="width:60px">数量</th><th style="width:90px">小计</th></tr></thead><tbody>
-          ${rows}
-          </tbody></table>
-          <div class="total">合计：¥${Number(d.total_amount).toFixed(2)}</div>
-          <div class="pay">实支：¥${Number(d.actual_pay || d.total_amount).toFixed(2)}</div>
-        </div>`;
-      }).join('\n');
-      const rangeText = (dateFrom || dateTo) ? `（${dateFrom || '最早'} 至 ${dateTo || '最新'}）` : '';
-      const html = `<!doctype html>
+    const rows = onlyList.map((p: any, i: number) => `
+      <tr${i % 2 === 0 ? ' class="even"' : ''}>
+        <td>${i + 1}</td><td>${p.order_no || ''}</td><td>${p.purchase_date || ''}</td><td>${p.supplier_name || '-'}</td>
+        <td>${p.item_count || 0} 项</td><td class="num">${Number(p.total_amount || 0).toFixed(2)}</td><td class="num">${Number(p.actual_pay || 0).toFixed(2)}</td>
+      </tr>`).join('');
+    const rangeText = (dateFrom || dateTo) ? `（${dateFrom || '最早'} 至 ${dateTo || '最新'}）` : '';
+    const sumTotal = onlyList.reduce((s: number, p: any) => s + Number(p.total_amount || 0), 0);
+    const sumPay = onlyList.reduce((s: number, p: any) => s + Number(p.actual_pay || 0), 0);
+    const html = `<!doctype html>
 <html><head><meta charset="utf-8"><title>食堂采购明细${rangeText}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;padding:30px;color:#333;font-size:13px}
-.sheet{border-bottom:2px solid #e5e7eb;padding-bottom:24px;margin-bottom:24px}
-.sheet:last-child{border-bottom:none;margin-bottom:0}
-h1{font-size:20px;margin-bottom:6px}
-.meta{color:#666;font-size:12px;margin-bottom:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px}
+body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;padding:30px 40px;color:#333;font-size:13px}
+h1{font-size:20px;margin-bottom:10px}
 table{width:100%;border-collapse:collapse;margin-bottom:16px}
-th{background:#1e40af;color:#fff;padding:7px 6px;text-align:center;font-size:12px}
-td{padding:6px;border-bottom:1px solid #e5e7eb;font-size:12px;text-align:center}
+th{background:#1e40af;color:#fff;padding:8px 6px;text-align:center;font-size:13px}
+td{padding:7px 6px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center}
 tr.even td{background:#f8fafc}
 .num{text-align:right;font-family:"Courier New",monospace}
-.total{font-size:15px;font-weight:bold;color:#dc2626;text-align:right;margin-bottom:4px}
-.pay{font-size:13px;font-weight:bold;text-align:right;margin-bottom:12px}
-@media print{body{padding:12px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sheet{page-break-inside:avoid}}
+tr.sum td{background:#eef2ff;font-weight:bold}
+@media print{body{padding:15px 25px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head><body>
-<div class="meta" style="justify-content:center;color:#111">
-  <span style="font-size:16px;font-weight:bold">食堂采购明细${rangeText} 共 ${details.length} 单</span>
-</div>
-${body}
+<h1>食堂采购明细${rangeText} 共 ${onlyList.length} 单</h1>
+<table><thead><tr><th style="width:40px">序号</th><th>采购单号</th><th style="width:100px">日期</th><th>供应商</th><th style="width:70px">明细</th><th style="width:90px">总金额</th><th style="width:90px">实支</th></tr></thead><tbody>
+${rows}
+<tr class="sum"><td colspan="5">合计</td><td class="num">${sumTotal.toFixed(2)}</td><td class="num">${sumPay.toFixed(2)}</td></tr>
+</tbody></table>
+<script>setTimeout(()=>window.print(),300)</script>
 </body></html>`;
-      const w = window.open('', '_blank');
-      if (!w) { showToast('浏览器拦截了打印窗口', '', 'destructive'); return; }
-      w.document.write(html);
-      w.document.close();
-    } catch (e: any) { showToast('打印失败', e.message, 'destructive'); }
+    const w = window.open('', '_blank');
+    if (!w) { showToast('浏览器拦截了打印窗口', '', 'destructive'); return; }
+    w.document.write(html);
+    w.document.close();
   };
 
   // 查看采购单详情
