@@ -14,7 +14,7 @@ const fmt = (n: any) => `¥${Number(n || 0).toFixed(2)}`;
 // 资源占用费收取缘由
 const FEE_REASONS = ['已报餐但未用餐', '未报餐而用餐', '未报餐未刷卡'];
 
-// ---------- CSV 解析（刷卡机个人餐别统计，支持单日或多日）----------
+// ---------- CSV 解析（刷卡流水明细 / 个人餐别统计，支持单日或多日）----------
 // 表头示例：工号,姓名,卡号,部门编号,部门名称,早餐|次数,早餐|金额,中餐|次数,中餐|金额,晚餐|次数,晚餐|金额,餐外消费|次数,餐外消费|金额,合计次数,合计金额
 // 数据行：每人一行；末行"汇总:"跳过；若表头含"日期"列则按日期分组生成多条（多日导入），否则归入 fallbackDate
 type MealDay = { date: string; breakfast_count: number; breakfast_amount: number; lunch_count: number; lunch_amount: number; dinner_count: number; dinner_amount: number; people: number };
@@ -464,10 +464,10 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
       {/* CSV 导入弹窗 */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader><DialogTitle>导入餐别统计</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>导入刷卡数据</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">选择刷卡机导出的「个人餐别统计」CSV 文件（支持 GBK/UTF-8）</label>
+              <label className="text-xs text-muted-foreground">选择刷卡机导出的 CSV 文件（支持「消费流水明细」或「个人餐别统计」，GBK/UTF-8 均可）</label>
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
