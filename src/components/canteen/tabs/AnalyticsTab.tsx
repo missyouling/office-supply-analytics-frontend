@@ -9,7 +9,7 @@ import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, Area,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Lightbulb, Download, CalendarRange } from 'lucide-react';
+import { Printer } from 'lucide-react';
 
 const fmt = (n: any) => `¥${Number(n || 0).toFixed(2)}`;
 const fmtNum = (n: any) => Number(n || 0).toLocaleString();
@@ -65,23 +65,21 @@ export default function AnalyticsTab() {
   const [foodShare, setFoodShare] = useState<any[]>([]);
   const [topSupplies, setTopSupplies] = useState<any[]>([]);
   const [compare, setCompare] = useState<any[]>([]);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [range, setRange] = useState({ from: `${year}-01`, to: `${year}-12` });
 
   const loadMonth = useCallback(async (m: string) => {
     setLoading(true);
     try {
-      const [s, t, b, f, top, sugg] = await Promise.all([
+      const [s, t, b, f, top] = await Promise.all([
         canteenApi.analytics.summary(m),
         canteenApi.analytics.dailyTrend(m),
         canteenApi.analytics.expenseBreakdown(m),
         canteenApi.analytics.foodShare(m),
         canteenApi.analytics.topSupplies(m, 5),
-        canteenApi.analytics.suggestions(m),
       ]);
       setSummary(s as unknown as Summary); setDailyTrend(t.items || []); setExpenseBreakdown(b);
-      setFoodShare(f.items || []); setTopSupplies(top.items || []); setSuggestions(sugg.items || []);
+      setFoodShare(f.items || []); setTopSupplies(top.items || []);
     } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
     finally { setLoading(false); }
   }, []);
@@ -109,15 +107,18 @@ export default function AnalyticsTab() {
     }
   };
 
-  // 每日盈亏明细表（支出 = 当日采购 + 当月其他费用分摊）
+  // 每日盈亏明细表（收入 = 消费收入 + 资源占用费 + 早餐收入；支出 = 采购支出 + 分摊支出）
   const dailyTable = dailyTrend.map((d, i) => {
     const share = d.share_expense || 0;
-    const totalExpense = (d.expense || 0) + share;
+    const purchase = d.expense || 0;
+    const income = d.income || 0;
+    const breakfast = d.breakfast || 0;
+    const totalExpense = purchase + share;
+    // 人均成本 = (采购支出 + 分摊支出 - 早餐收入) / 当日消费总人次
+    const costPerCapita = d.count ? ((purchase + share - breakfast) / d.count) : 0;
     return {
-      序号: i + 1, 日期: d.date, 收入: d.income || 0, 支出: totalExpense,
-      采购: d.expense || 0, 分摊支出: share,
-      盈亏: (d.income || 0) - totalExpense, 人次: d.count || 0,
-      人均: d.count ? ((d.income || 0) / d.count).toFixed(2) : '-',
+      序号: i + 1, 日期: d.date, 收入: income, 采购支出: purchase, 分摊支出: share,
+      盈亏: income - totalExpense, 人次: d.count || 0, 人均成本: d.count ? costPerCapita.toFixed(2) : '-',
     };
   });
 
@@ -136,15 +137,75 @@ export default function AnalyticsTab() {
     perCapita: c.count ? ((c.income || 0) / c.count).toFixed(2) : 0,
   }));
 
-  const exportDetail = () => {
-    const rows = [['序号', '日期', '收入', '支出', '采购', '分摊支出', '盈亏', '人次', '人均']];
-    dailyTable.forEach((r) => rows.push([r.序号, r.日期, r.收入, r.支出, r.采购, r.分摊支出, r.盈亏, r.人次, r.人均]));
-    const csv = '\uFEFF' + rows.map((r) => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `食堂收支明细_${period === 'month' ? month : `${range.from}_${range.to}`}.csv`; a.click();
-    URL.revokeObjectURL(url);
+  // 打印预览每日盈亏明细
+  const printDetail = () => {
+    const headers = ['序号', '日期', '收入', '采购支出', '分摊支出', '盈亏', '人次', '人均成本'];
+    const rows = dailyTable.map((r) => [
+      r.序号, r.日期, Number(r.收入).toFixed(2), Number(r.采购支出).toFixed(2), Number(r.分摊支出).toFixed(2),
+      Number(r.盈亏).toFixed(2), r.人次, r.人均成本 === '-' ? '-' : r.人均成本,
+    ]);
+    const body = rows.map((r, i) => `<tr${i % 2 === 0 ? ' class="even"' : ''}>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('\n');
+    const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>每日盈亏明细（${month}）</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;padding:30px 40px;color:#333;font-size:13px}
+h1{font-size:20px;margin-bottom:10px}
+table{width:100%;border-collapse:collapse;margin-bottom:16px}
+th{background:#1e40af;color:#fff;padding:8px 6px;text-align:center;font-size:13px}
+td{padding:7px 6px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center}
+tr.even td{background:#f8fafc}
+.formula{background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:10px 14px;font-size:13px;line-height:1.9;color:#0c4a6e}
+@media print{body{padding:15px 25px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<h1>每日盈亏明细（${month}）</h1>
+<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>
+${body}
+</tbody></table>
+<div class="formula">
+<b>计算口径：</b><br>
+收入 = 消费收入 + 资源占用费收入 + 早餐收入<br>
+支出 = 采购支出 + 分摊支出<br>
+人均成本 = (采购支出 + 分摊支出 − 早餐收入) ÷ 当日消费总人次
+</div>
+<script>setTimeout(()=>window.print(),300)</script>
+</body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { showToast('浏览器拦截了打印窗口', '', 'destructive'); return; }
+    w.document.write(html);
+    w.document.close();
+  };
+
+  // 打印预览月度对比明细
+  const printCompare = () => {
+    const headers = ['月份', '收入', '食材', '其他', '盈亏', '人次', '人均'];
+    const rows = compareData.map((c) => [
+      c.month, Number(c.totalIncome).toFixed(2), Number(c.food).toFixed(2), Number(c.other).toFixed(2),
+      Number(c.profit).toFixed(2), c.count || 0, c.perCapita || 0,
+    ]);
+    const body = rows.map((r, i) => `<tr${i % 2 === 0 ? ' class="even"' : ''}>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('\n');
+    const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>月度对比明细（${period === 'half' ? `${range.from} 至 ${range.to}` : year}）</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;padding:30px 40px;color:#333;font-size:13px}
+h1{font-size:20px;margin-bottom:10px}
+table{width:100%;border-collapse:collapse;margin-bottom:16px}
+th{background:#1e40af;color:#fff;padding:8px 6px;text-align:center;font-size:13px}
+td{padding:7px 6px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center}
+tr.even td{background:#f8fafc}
+@media print{body{padding:15px 25px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<h1>月度对比明细（${period === 'half' ? `${range.from} 至 ${range.to}` : year}）</h1>
+<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>
+${body}
+</tbody></table>
+<script>setTimeout(()=>window.print(),300)</script>
+</body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { showToast('浏览器拦截了打印窗口', '', 'destructive'); return; }
+    w.document.write(html);
+    w.document.close();
   };
 
   // 趋势图数据：支出 = 采购 + 分摊
@@ -262,52 +323,50 @@ export default function AnalyticsTab() {
             </Card>
           </div>
 
-          {/* 优化建议 */}
-          {suggestions.length > 0 && (
-            <Card className="border-amber-200 bg-amber-50/40">
-              <CardHeader><CardTitle className="text-sm flex items-center gap-1"><Lightbulb className="h-4 w-4 text-amber-500" />优化建议</CardTitle></CardHeader>
-              <CardContent>
-                <ul className="space-y-1.5">
-                  {suggestions.map((s, i) => <li key={i} className="text-sm flex gap-2"><span className="text-amber-500">●</span>{s}</li>)}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
+          {/* 优化建议已移除 */}
 
           {/* 每日盈亏明细表 */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm">每日盈亏明细</CardTitle>
-              <Button size="sm" variant="outline" onClick={exportDetail}><Download className="mr-1 h-4 w-4" />导出</Button>
+              <Button size="sm" variant="outline" onClick={printDetail}><Printer className="mr-1 h-4 w-4" />打印</Button>
             </CardHeader>
             <CardContent className="p-0">
               <Table className="max-h-[40vh]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28 text-center">日期</TableHead>
-                    <TableHead className="w-28 text-center">收入</TableHead><TableHead className="w-28 text-center">支出</TableHead>
-                    <TableHead className="w-24 text-center">采购</TableHead><TableHead className="w-28 text-center">分摊支出</TableHead>
-                    <TableHead className="w-28 text-center">盈亏</TableHead><TableHead className="w-20 text-center">人次</TableHead><TableHead className="w-24 text-center">人均</TableHead>
+                    <TableHead className="w-28 text-center">收入</TableHead>
+                    <TableHead className="w-28 text-center">采购支出</TableHead><TableHead className="w-28 text-center">分摊支出</TableHead>
+                    <TableHead className="w-28 text-center">盈亏</TableHead><TableHead className="w-20 text-center">人次</TableHead><TableHead className="w-28 text-center">人均成本</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {dailyTable.length === 0 ? (
-                    <TableRow><TableCell colSpan={9} className="h-16 text-center text-muted-foreground">本月无记录</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="h-16 text-center text-muted-foreground">本月无记录</TableCell></TableRow>
                   ) : dailyTable.map((r) => (
                     <TableRow key={r.序号}>
                       <TableCell className="text-center text-muted-foreground">{r.序号}</TableCell>
                       <TableCell className="text-center">{r.日期}</TableCell>
                       <TableCell className="text-green-600 text-center">{fmt(r.收入)}</TableCell>
-                      <TableCell className="text-red-600 text-center">{r.支出 ? fmt(r.支出) : '-'}</TableCell>
-                      <TableCell className="text-center">{r.采购 ? fmt(r.采购) : '-'}</TableCell>
+                      <TableCell className="text-center">{r.采购支出 ? fmt(r.采购支出) : '-'}</TableCell>
                       <TableCell className="text-amber-600 text-center">{r.分摊支出 ? fmt(r.分摊支出) : '-'}</TableCell>
                       <TableCell className={`font-medium text-center ${r.盈亏 >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(r.盈亏)}</TableCell>
                       <TableCell className="text-center">{r.人次 || '-'}</TableCell>
-                      <TableCell className="text-center">{r.人均}</TableCell>
+                      <TableCell className="text-center">{r.人均成本}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+            {/* 计算口径公式（突出显示） */}
+            <CardContent className="p-4 pt-2">
+              <div className="rounded-md bg-blue-50 border border-blue-200 px-4 py-3 text-sm leading-7 text-blue-900">
+                <p className="font-semibold mb-1">📐 计算口径</p>
+                <p>收入 = 消费收入 + 资源占用费收入 + 早餐收入</p>
+                <p>支出 = 采购支出 + 分摊支出</p>
+                <p>人均成本 = (采购支出 + 分摊支出 − 早餐收入) ÷ 当日消费总人次</p>
+              </div>
             </CardContent>
           </Card>
         </>
@@ -380,7 +439,7 @@ export default function AnalyticsTab() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-sm">月度对比明细</CardTitle>
-                <Button size="sm" variant="outline" onClick={exportDetail}><Download className="mr-1 h-4 w-4" />导出</Button>
+                <Button size="sm" variant="outline" onClick={printCompare}><Printer className="mr-1 h-4 w-4" />打印</Button>
               </CardHeader>
               <CardContent className="p-0">
                 <Table className="max-h-[40vh]">
