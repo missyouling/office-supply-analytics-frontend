@@ -10,9 +10,11 @@ import SettingsPage from '@/components/settings/SettingsPage';
 import PurchasesPage from '@/components/purchases/PurchasesPage';
 import PaymentsPage from '@/components/payments/PaymentsPage';
 import CanteenPage from '@/components/canteen/CanteenPage';
+import AuthGate from '@/components/AuthGate';
 
 export default function App() {
   return (
+    <AuthGate>
     <BrowserRouter>
       <Toaster />
       <Routes>
@@ -33,5 +35,6 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </AuthGate>
   );
 }

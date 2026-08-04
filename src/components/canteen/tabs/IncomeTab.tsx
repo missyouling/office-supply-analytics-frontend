@@ -718,7 +718,7 @@ tr.even td{background:#f8fafc}
             <div className="grid grid-cols-2 gap-2">
               <Input type="date" value={form.fee_date} onChange={(e) => setForm({ ...form, fee_date: e.target.value })} />
               <select className="h-9 rounded-md border px-2 text-sm" value={form.meal_type} onChange={(e) => setForm({ ...form, meal_type: e.target.value })}>
-                <option value="午餐">午餐</option><option value="晚餐">晚餐</option>
+                <option value="午餐">午餐</option><option value="晚餐">晚餐</option><option value="午餐+晚餐">午餐+晚餐</option>
               </select>
             </div>
             <div className="grid grid-cols-2 gap-2">
