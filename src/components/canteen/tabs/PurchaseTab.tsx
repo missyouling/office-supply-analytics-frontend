@@ -24,16 +24,9 @@ function PurchasePanel() {
   const [loadingMore, setLoadingMore] = useState(false);
   const limit = 50;
   const scrollRef = useRef<HTMLDivElement>(null);
-  // 日期范围筛选（默认当月全部数据）
-  const monthBounds = () => {
-    const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth();
-    const first = `${y}-${String(m + 1).padStart(2, '0')}-01`;
-    const last = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
-    return { first, last };
-  };
-  const [dateFrom, setDateFrom] = useState(monthBounds().first);
-  const [dateTo, setDateTo] = useState(monthBounds().last);
+  // 日期范围筛选（默认空 = 显示全部采购数据）
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   // 新建/编辑采购单
   const [open, setOpen] = useState(false);
@@ -168,8 +161,9 @@ function PurchasePanel() {
           <div class="pay">实支：¥${Number(d.actual_pay || d.total_amount).toFixed(2)}</div>
         </div>`;
       }).join('\n');
+      const rangeText = (dateFrom || dateTo) ? `（${dateFrom || '最早'} 至 ${dateTo || '最新'}）` : '';
       const html = `<!doctype html>
-<html><head><meta charset="utf-8"><title>食堂采购明细（${dateFrom} 至 ${dateTo}）</title>
+<html><head><meta charset="utf-8"><title>食堂采购明细${rangeText}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;padding:30px;color:#333;font-size:13px}
@@ -187,7 +181,7 @@ tr.even td{background:#f8fafc}
 @media print{body{padding:12px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sheet{page-break-inside:avoid}}
 </style></head><body>
 <div class="meta" style="justify-content:center;color:#111">
-  <span style="font-size:16px;font-weight:bold">食堂采购明细（${dateFrom} 至 ${dateTo}）共 ${details.length} 单</span>
+  <span style="font-size:16px;font-weight:bold">食堂采购明细${rangeText} 共 ${details.length} 单</span>
 </div>
 ${body}
 </body></html>`;
@@ -271,7 +265,6 @@ ${rows}
             <Input type="date" className="h-8 w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
             <span className="text-xs text-muted-foreground">至</span>
             <Input type="date" className="h-8 w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            <Button size="sm" variant="outline" onClick={() => { const b = monthBounds(); setDateFrom(b.first); setDateTo(b.last); }}>本月</Button>
             <Button size="sm" variant="outline" onClick={() => printAll()}><Printer className="mr-1 h-4 w-4" />打印</Button>
             <Button size="sm" onClick={openNew}><Plus className="mr-1 h-4 w-4" />新建</Button>
           </div>
@@ -469,10 +462,8 @@ function ExpensePanel() {
     elec_usage: 50,         // 用电量 度/天
     gas_usage: 10,          // 用气量 m³/天
     gas_price: 3.55,        // 天然气单价 元/m³
-    labor: 0,               // 工资（手动估算）
-    maintenance: 0,         // 设备维护费（手动估算）
   });
-  // 实际金额（用户手填，>0 时数据分析优先采用）
+  // 实际金额（用户手填，>0 时数据分析优先采用；工资/设备维护费只录实际金额，估算恒为 0）
   const [actual, setActual] = useState<Record<string, number>>({ water: 0, elec: 0, gas: 0, labor: 0, maintenance: 0 });
   const [saving, setSaving] = useState(false);
 
@@ -486,12 +477,12 @@ function ExpensePanel() {
   };
   const days = elapsedDays(month);
 
-  // 估算金额
+  // 估算金额（工资/设备维护费估算恒为 0，只以实际金额为准）
   const waterEst = people * (params.water_per_capita / 1000) * params.water_price;
   const elecEst = params.elec_usage * days;
   const gasEst = params.gas_usage * days * params.gas_price;
-  const laborEst = Number(params.labor) || 0;
-  const maintEst = Number(params.maintenance) || 0;
+  const laborEst = 0;
+  const maintEst = 0;
   // 分析金额（有实际用实际，无实际用估算）
   const A = (key: string, est: number) => (Number(actual[key]) > 0 ? Number(actual[key]) : est);
   const totalEst = waterEst + elecEst + gasEst + laborEst + maintEst;
@@ -512,8 +503,6 @@ function ExpensePanel() {
       const prs = (rec: any, dft: any) => { if (!rec?.params) return dft; try { return { ...dft, ...JSON.parse(rec.params) }; } catch { return dft; } };
       setParams((prev) => ({
         ...prs(w, prev), ...prs(e, prev), ...prs(g, prev),
-        labor: l ? Number(l.amount) || 0 : prev.labor,
-        maintenance: m ? Number(m.amount) || 0 : prev.maintenance,
       }));
       setActual({
         water: w ? Number(w.actual_amount) || 0 : 0,
@@ -620,16 +609,16 @@ function ExpensePanel() {
             <TableRow>
               <TableCell className="text-center text-muted-foreground">4</TableCell>
               <TableCell className="font-medium text-center">工资</TableCell>
-              <TableCell className="text-center"><Input type="number" className={numCls} value={params.labor || ''} onChange={(e) => setParams({ ...params, labor: parseFloat(e.target.value) || 0 })} /></TableCell>
-              <TableCell className="font-medium text-center">{fmt(laborEst)}</TableCell>
+              <TableCell className="text-center text-muted-foreground">只记实际金额</TableCell>
+              <TableCell className="font-medium text-center">{fmt(0)}</TableCell>
               <TableCell className="text-center"><Input type="number" className={numCls} value={Number(actual.labor) > 0 ? actual.labor : ''} onChange={(e) => setActual({ ...actual, labor: parseFloat(e.target.value) || 0 })} /></TableCell>
             </TableRow>
             {/* 设备维护费 */}
             <TableRow>
               <TableCell className="text-center text-muted-foreground">5</TableCell>
               <TableCell className="font-medium text-center">设备维护费</TableCell>
-              <TableCell className="text-center"><Input type="number" className={numCls} value={params.maintenance || ''} onChange={(e) => setParams({ ...params, maintenance: parseFloat(e.target.value) || 0 })} /></TableCell>
-              <TableCell className="font-medium text-center">{fmt(maintEst)}</TableCell>
+              <TableCell className="text-center text-muted-foreground">只记实际金额</TableCell>
+              <TableCell className="font-medium text-center">{fmt(0)}</TableCell>
               <TableCell className="text-center"><Input type="number" className={numCls} value={Number(actual.maintenance) > 0 ? actual.maintenance : ''} onChange={(e) => setActual({ ...actual, maintenance: parseFloat(e.target.value) || 0 })} /></TableCell>
             </TableRow>
             {/* 合计行 */}
