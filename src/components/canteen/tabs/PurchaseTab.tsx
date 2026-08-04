@@ -160,7 +160,7 @@ tr.sum td{background:#eef2ff;font-weight:bold}
 @media print{body{padding:15px 25px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head><body>
 <h1>食堂采购明细${rangeText} 共 ${onlyList.length} 单</h1>
-<table><thead><tr><th style="width:40px">序号</th><th>采购单号</th><th style="width:100px">日期</th><th>供应商</th><th style="width:70px">明细</th><th style="width:90px">总金额</th><th style="width:90px">实支</th></tr></thead><tbody>
+<table><thead><tr><th style="width:40px">序号</th><th>采购单号</th><th style="width:100px">日期</th><th>供应商</th><th style="width:70px">明细</th><th style="width:90px">总金额</th><th style="width:90px">实际支出</th></tr></thead><tbody>
 ${rows}
 <tr class="sum"><td colspan="5">合计</td><td class="num">${sumTotal.toFixed(2)}</td><td class="num">${sumPay.toFixed(2)}</td></tr>
 </tbody></table>
@@ -262,14 +262,15 @@ ${rows}
                 <th className="px-2 py-2 text-center font-medium whitespace-nowrap">供应商</th>
                 <th className="px-2 py-2 text-center font-medium whitespace-nowrap">明细</th>
                 <th className="px-2 py-2 text-center font-medium whitespace-nowrap">总金额</th>
-                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">实支</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">实际支出</th>
                 <th className="px-2 py-2 text-center font-medium whitespace-nowrap">操作</th>
               </tr>
             </thead>
             <tbody>
               {list.length === 0 ? (
                 <tr><td colSpan={8} className="h-16 text-center text-muted-foreground text-sm">暂无采购单</td></tr>
-              ) : list.map((p) => (
+              ) : (<>
+              {list.map((p) => (
                 <tr key={p.id} className="border-b hover:bg-muted/50">
                   <td className="px-2 py-1.5 text-center text-muted-foreground">{p.id}</td>
                   <td className="px-2 py-1.5 text-center font-medium">{p.order_no}</td>
@@ -285,6 +286,13 @@ ${rows}
                   </td>
                 </tr>
               ))}
+              <tr className="bg-emerald-50/70 font-semibold border-t-2 border-emerald-200">
+                <td colSpan={5} className="px-2 py-2 text-center text-emerald-900">合计</td>
+                <td className="px-2 py-2 text-center text-emerald-900">{fmt(list.reduce((s: number, p: any) => s + Number(p.total_amount || 0), 0))}</td>
+                <td className="px-2 py-2 text-center text-emerald-900">{fmt(list.reduce((s: number, p: any) => s + Number(p.actual_pay || 0), 0))}</td>
+                <td />
+              </tr>
+              </>)}
             </tbody>
           </table>
           {loadingMore && <div className="py-2 text-center text-xs text-muted-foreground">加载中…</div>}
@@ -374,7 +382,7 @@ ${rows}
                 <div><span className="text-muted-foreground text-xs">日期</span><div className="font-medium">{viewDetail.purchase_date}</div></div>
                 <div><span className="text-muted-foreground text-xs">供应商</span><div className="font-medium">{viewDetail.supplier_name || '-'}</div></div>
                 <div><span className="text-muted-foreground text-xs">渠道</span><div className="font-medium">{viewDetail.channel || '-'}</div></div>
-                <div><span className="text-muted-foreground text-xs">实支</span><div className="font-medium text-red-600">{viewDetail.actual_pay ? fmt(viewDetail.actual_pay) : '-'}</div></div>
+                <div><span className="text-muted-foreground text-xs">实际支出</span><div className="font-medium text-red-600">{viewDetail.actual_pay ? fmt(viewDetail.actual_pay) : '-'}</div></div>
               </div>
               {viewDetail.remark && <p className="text-xs text-muted-foreground"><span className="text-muted-foreground">备注：</span>{viewDetail.remark}</p>}
               <div className="flex-1 min-h-0 overflow-y-auto">

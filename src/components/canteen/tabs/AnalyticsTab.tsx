@@ -76,7 +76,7 @@ export default function AnalyticsTab() {
         canteenApi.analytics.dailyTrend(m),
         canteenApi.analytics.expenseBreakdown(m),
         canteenApi.analytics.foodShare(m),
-        canteenApi.analytics.topSupplies(m, 5),
+        canteenApi.analytics.topSupplies(m, 10),
       ]);
       setSummary(s as unknown as Summary); setDailyTrend(t.items || []); setExpenseBreakdown(b);
       setFoodShare(f.items || []); setTopSupplies(top.items || []);
@@ -315,9 +315,9 @@ ${body}
               </CardContent>
             </Card>
 
-            {/* Top5 食材 */}
+            {/* Top10 食材（按采购金额） */}
             <Card>
-              <CardHeader><CardTitle className="text-sm">采购量 Top 5 食材</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-sm">采购金额 Top 10 食材</CardTitle></CardHeader>
               <CardContent className="h-64">
                 {topSupplies.length === 0 ? <p className="text-sm text-muted-foreground text-center pt-20">暂无采购数据</p> :
                   <ResponsiveContainer width="100%" height="100%">
@@ -325,10 +325,8 @@ ${body}
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" tick={{ fontSize: 10 }} />
                       <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(v: any, n: any) => [n === '数量' ? `${v} ${topSupplies[0]?.unit || ''}` : fmt(v), n]} />
-                      <Legend />
-                      <Bar dataKey="quantity" name="数量" fill="#2563eb" />
-                      <Bar dataKey="amount" name="金额" fill="#f59e0b" />
+                      <Tooltip formatter={(v: any) => fmt(v)} />
+                      <Bar dataKey="amount" name="采购金额" fill="#2563eb" radius={[0, 3, 3, 0]} />
                     </BarChart>
                   </ResponsiveContainer>}
               </CardContent>
