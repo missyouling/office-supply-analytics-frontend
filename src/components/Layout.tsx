@@ -1,4 +1,5 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 // 办公用品模块子导航
@@ -25,6 +26,7 @@ function isOfficePath(path: string) {
 export default function Layout() {
   const location = useLocation();
   const showOfficeNav = isOfficePath(location.pathname);
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -56,10 +58,7 @@ export default function Layout() {
           {/* 退出登录 */}
           <button
             title="退出登录"
-            onClick={() => {
-              sessionStorage.removeItem('oms_auth_ok');
-              window.location.href = '/';
-            }}
+            onClick={() => setLogoutOpen(true)}
             className="ml-auto flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors whitespace-nowrap"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -68,6 +67,35 @@ export default function Layout() {
             退出
           </button>
         </div>
+        {/* 退出确认弹层 */}
+        {logoutOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40" onClick={() => setLogoutOpen(false)}>
+            <div
+              className="w-80 rounded-xl bg-white p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="mb-2 text-center text-base font-semibold text-slate-800">确认退出登录？</h3>
+              <p className="mb-5 text-center text-sm text-slate-500">退出后需重新输入密码才能进入系统</p>
+              <div className="flex justify-center gap-3">
+                <button
+                  className="rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
+                  onClick={() => setLogoutOpen(false)}
+                >
+                  取消
+                </button>
+                <button
+                  className="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                  onClick={() => {
+                    sessionStorage.removeItem('oms_auth_ok');
+                    window.location.href = '/';
+                  }}
+                >
+                  确认退出
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* 办公用品模块子导航 */}
         {showOfficeNav && (
           <div className="border-t bg-slate-50/80">

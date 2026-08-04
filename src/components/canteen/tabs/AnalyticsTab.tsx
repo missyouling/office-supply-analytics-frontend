@@ -66,6 +66,11 @@ export default function AnalyticsTab() {
   const [topSupplies, setTopSupplies] = useState<any[]>([]);
   const [compare, setCompare] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  // 半年度：上半年/下半年选择（默认当前所在半年），year 用于半年度/年度
+  const [half, setHalf] = useState<'h1' | 'h2'>(() => {
+    const mo = Number(currentMonth().slice(5, 7));
+    return mo <= 6 ? 'h1' : 'h2';
+  });
   const [range, setRange] = useState({ from: `${year}-01`, to: `${year}-12` });
 
   const loadMonth = useCallback(async (m: string) => {
@@ -100,11 +105,22 @@ export default function AnalyticsTab() {
     if (p === 'month') loadMonth(month);
     else if (p === 'half') {
       const y = Number(year);
-      setRange({ from: `${year}-01`, to: `${year}-06` });
-      loadCompare({ from: `${year}-01`, to: `${year}-06` });
+      const from = half === 'h1' ? `${year}-01` : `${year}-07`;
+      const to = half === 'h1' ? `${year}-06` : `${year}-12`;
+      setRange({ from, to });
+      loadCompare({ from, to });
     } else if (p === 'year') {
       loadCompare({ year });
     }
+  };
+
+  // 切换上半年/下半年
+  const changeHalf = (h: 'h1' | 'h2') => {
+    setHalf(h);
+    const from = h === 'h1' ? `${year}-01` : `${year}-07`;
+    const to = h === 'h1' ? `${year}-06` : `${year}-12`;
+    setRange({ from, to });
+    loadCompare({ from, to });
   };
 
   // 每日盈亏明细表（收入 = 消费收入 + 资源占用费 + 早餐收入；支出 = 采购支出 + 分摊支出）
@@ -262,11 +278,16 @@ ${body}
             {period === 'month' ? (
               <Input type="month" className="h-8 w-40" value={month} onChange={(e) => setMonth(e.target.value || month)} />
             ) : period === 'half' ? (
-              <div className="flex items-center gap-1">
-                <Input type="month" className="h-8 w-36" value={range.from} onChange={(e) => setRange({ ...range, from: e.target.value || range.from })} />
-                <span className="text-xs text-muted-foreground">至</span>
-                <Input type="month" className="h-8 w-36" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value || range.to })} />
-                <Button size="sm" variant="outline" onClick={() => loadCompare({ from: range.from, to: range.to })}>查询</Button>
+              <div className="flex items-center gap-2">
+                <Input className="h-8 w-20" value={year} onChange={(e) => setYear(e.target.value || year)} onBlur={() => changeHalf(half)} />
+                <select
+                  className="h-8 rounded-md border px-2 text-sm"
+                  value={half}
+                  onChange={(e) => changeHalf(e.target.value as 'h1' | 'h2')}
+                >
+                  <option value="h1">上半年</option>
+                  <option value="h2">下半年</option>
+                </select>
               </div>
             ) : (
               <div className="flex items-center gap-1">
