@@ -16,8 +16,9 @@ const FEE_REASONS = ['已报餐但未用餐', '未报餐而用餐', '未报餐�
 
 // ---------- CSV 解析（刷卡机个人餐别统计，支持单日或多日）----------
 // 表头示例：工号,姓名,卡号,部门编号,部门名称,早餐|次数,早餐|金额,中餐|次数,中餐|金额,晚餐|次数,晚餐|金额,餐外消费|次数,餐外消费|金额,合计次数,合计金额
-// 数据行：每人一行；末行"汇总:"跳过；若表头含"日期"列则按日期分组生成多条（多日导入），否则归入用户所选日期（单日模板）
-function parseMealCsv(text: string, fallbackDate: string): { date: string; breakfast_count: number; breakfast_amount: number; lunch_count: number; lunch_amount: number; dinner_count: number; dinner_amount: number; people: number }[] | null {
+// 数据行：每人一行；末行"汇总:"跳过；若表头含"日期"列则按日期分组生成多条（多日导入），否则归入 fallbackDate
+type MealDay = { date: string; breakfast_count: number; breakfast_amount: number; lunch_count: number; lunch_amount: number; dinner_count: number; dinner_amount: number; people: number };
+function parseMealCsv(text: string, fallbackDate: string): { hasDate: boolean; days: MealDay[] } | null {
   // 简单 CSV 解析（支持双引号包裹、逗号分隔）
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return null;
@@ -47,12 +48,26 @@ function parseMealCsv(text: string, fallbackDate: string): { date: string; break
   const dCnt = findCol('晚餐', '次数'), dAmt = findCol('晚餐', '金额');
   if (bCnt < 0 || lCnt < 0 || dCnt < 0) return null;
 
-  // 日期列：表头含"日期"或"date"（多日文件），否则用用户所选日期
-  let dateIdx = header.findIndex((h) => h.includes('日期') || h.includes('date'));
+  // 日期列：宽泛识别（日期/时间/date/日/用餐/消费），多日文件每行带日期
+  let dateIdx = header.findIndex((h) => /日期|时间|date|日/.test(h));
+  // 兼容日期列名带 | 或空格（如"用餐|日期"）
+  if (dateIdx < 0) dateIdx = header.findIndex((h) => /用餐|消费|统计/.test(h) && /日|date/.test(h));
+  // 多格式日期解析：YYYY-MM-DD / YYYY/M/D / YYYYMMDD / YYYY年M月D日 / M月D日
   const parseDate = (v: string): string => {
-    const m = String(v || '').match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-    if (!m) return '';
-    return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+    const s = String(v || '').trim();
+    let m = s.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+    m = s.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+    m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = s.match(/(\d{1,2})月(\d{1,2})日/);
+    if (m) {
+      const now = new Date();
+      const y = now.getFullYear();
+      return `${y}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
+    }
+    return '';
   };
 
   const num = (v: string): number => {
@@ -62,14 +77,18 @@ function parseMealCsv(text: string, fallbackDate: string): { date: string; break
 
   // 按日期分组累加（date -> 统计）
   const byDate = new Map<string, { breakfast_count: number; breakfast_amount: number; lunch_count: number; lunch_amount: number; dinner_count: number; dinner_amount: number; people: number }>();
+  let hasAnyDate = false; // 文件是否含至少一条可识别日期
   for (let i = 1; i < lines.length; i++) {
     const cols = parseLine(lines[i]);
     const first = cols[0] || '';
     // 跳过汇总/合计行
     if (/汇总|合计|总计|小计/.test(first)) continue;
-    if (!/^\d/.test(first) && !/\d{4}[-/]/.test(first)) continue;
+    if (cols.every((c) => c === '')) continue;
+    // 日期优先取日期列，其次尝试首列（兼容首列即日期的格式）
     let date = dateIdx >= 0 ? parseDate(cols[dateIdx]) : '';
-    if (!date) date = fallbackDate; // 无日期列或缺日期 → 归入所选日期
+    if (!date && cols[0]) date = parseDate(cols[0]);
+    if (!date) date = fallbackDate;
+    else hasAnyDate = true;
     if (!byDate.has(date)) byDate.set(date, { breakfast_count: 0, breakfast_amount: 0, lunch_count: 0, lunch_amount: 0, dinner_count: 0, dinner_amount: 0, people: 0 });
     const g = byDate.get(date)!;
     g.people++;
@@ -81,10 +100,13 @@ function parseMealCsv(text: string, fallbackDate: string): { date: string; break
     g.dinner_amount += num(cols[dAmt]);
   }
   if (byDate.size === 0) return null;
-  // 按日期升序返回（1号→31号）
-  return Array.from(byDate.entries())
-    .map(([date, g]) => ({ date, ...g }))
-    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  // 按日期升序返回（1号→31号）；hasDate 标记是否来自文件日期
+  return {
+    hasDate: hasAnyDate,
+    days: Array.from(byDate.entries())
+      .map(([date, g]) => ({ date, ...g }))
+      .sort((a, b) => (a.date < b.date ? -1 : 1)),
+  };
 }
 
 async function readCsvFile(file: File): Promise<string> {
@@ -166,7 +188,6 @@ function IncomePanel() {
 
   // ===== CSV 导入 =====
   const [importOpen, setImportOpen] = useState(false);
-  const [importDate, setImportDate] = useState(new Date().toISOString().slice(0, 10));
   const [fileName, setFileName] = useState('');
   const [parsed, setParsed] = useState<any>(null);
   const [importing, setImporting] = useState(false);
@@ -184,11 +205,12 @@ function IncomePanel() {
   };
 
   const doImport = async () => {
-    if (!parsed || !importDate) return;
+    if (!parsed || !parsed.days?.length) return;
     setImporting(true);
     try {
-      // 支持多日：按日期逐条 upsert（同日期自动更新已有数据）
-      for (const day of parsed) {
+      // 按日期逐条 upsert（同日期自动更新已有数据）；日期全部来自文件，用户无需选择
+      const days = parsed.days as any[];
+      for (const day of days) {
         await canteenApi.income.save({
           income_date: day.date,
           breakfast_count: day.breakfast_count, breakfast_amount: day.breakfast_amount,
@@ -197,12 +219,11 @@ function IncomePanel() {
           remark: `CSV导入(${fileName})`,
         });
       }
-      const days = parsed.length;
-      const totalPeople = parsed.reduce((s: number, d: any) => s + (d.people || 0), 0);
-      showToast(days > 1 ? `✅ 已导入 ${days} 天数据（${totalPeople} 人次）` : `✅ 已导入 ${parsed[0].people} 人数据到 ${parsed[0].date}`);
+      const totalPeople = days.reduce((s: number, d: any) => s + (d.people || 0), 0);
+      showToast(days.length > 1 ? `✅ 已导入 ${days.length} 天数据（${totalPeople} 人次）` : `✅ 已导入 ${days[0].people} 人数据到 ${days[0].date}`);
       setImportOpen(false); setParsed(null); setFileName('');
       // 跳转到数据所在月份（取第一天的月份；跨月数据保持当月视图由用户切换）
-      setMonth((parsed[0].date || importDate).slice(0, 7)); load();
+      setMonth((days[0].date || '').slice(0, 7)); load();
     } catch (e: any) { showToast('导入失败', e.message, 'destructive'); }
     finally { setImporting(false); }
   };
@@ -253,7 +274,7 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
           <h3 className="text-sm font-semibold">每日刷卡收入</h3>
           <div className="flex gap-2 items-center">
             <Input type="month" className="h-8 w-36" value={month} onChange={(e) => setMonth(e.target.value)} />
-            <Button size="sm" variant="outline" onClick={() => { setImportDate(new Date().toISOString().slice(0, 10)); setFileName(''); setParsed(null); setImportOpen(true); }}>
+            <Button size="sm" variant="outline" onClick={() => { setFileName(''); setParsed(null); setImportOpen(true); }}>
               <Upload className="mr-1 h-4 w-4" />导入
             </Button>
             <Button size="sm" onClick={openNew}><Plus className="mr-1 h-4 w-4" />新增</Button>
@@ -356,10 +377,6 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
           <DialogHeader><DialogTitle>导入餐别统计</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">统计日期（该日期的早/中/晚收入）</label>
-              <Input type="date" value={importDate} onChange={(e) => setImportDate(e.target.value)} />
-            </div>
-            <div className="space-y-1">
               <label className="text-xs text-muted-foreground">选择刷卡机导出的「个人餐别统计」CSV 文件（支持 GBK/UTF-8）</label>
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
               <div className="flex items-center gap-2">
@@ -374,22 +391,25 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
                 )}
               </div>
             </div>
-            {parsed && (
+            {parsed && parsed.days && (
               <div className="rounded-md border bg-slate-50 p-3 space-y-1.5 text-sm">
-                {parsed.length === 1 ? (
+                {parsed.hasDate === false && (
+                  <p className="text-[11px] text-amber-600">⚠️ 文件未检测到日期列，数据将按今日日期 {parsed.days[0].date} 写入</p>
+                )}
+                {parsed.days.length === 1 ? (
                   <>
-                    <p className="font-medium">解析结果：{parsed[0].people} 人（{parsed[0].date}）</p>
+                    <p className="font-medium">解析结果：{parsed.days[0].people} 人（{parsed.days[0].date}）</p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                      <span>早餐：{parsed[0].breakfast_count} 次 / {fmt(parsed[0].breakfast_amount)}</span>
-                      <span>午餐：{parsed[0].lunch_count} 次 / {fmt(parsed[0].lunch_amount)}</span>
-                      <span>晚餐：{parsed[0].dinner_count} 次 / {fmt(parsed[0].dinner_amount)}</span>
-                      <span className="text-blue-700 font-medium">总人次（午+晚）{parsed[0].lunch_count + parsed[0].dinner_count} / 总额 {fmt(parsed[0].breakfast_amount + parsed[0].lunch_amount + parsed[0].dinner_amount)}</span>
+                      <span>早餐：{parsed.days[0].breakfast_count} 次 / {fmt(parsed.days[0].breakfast_amount)}</span>
+                      <span>午餐：{parsed.days[0].lunch_count} 次 / {fmt(parsed.days[0].lunch_amount)}</span>
+                      <span>晚餐：{parsed.days[0].dinner_count} 次 / {fmt(parsed.days[0].dinner_amount)}</span>
+                      <span className="text-blue-700 font-medium">总人次（午+晚）{parsed.days[0].lunch_count + parsed.days[0].dinner_count} / 总额 {fmt(parsed.days[0].breakfast_amount + parsed.days[0].lunch_amount + parsed.days[0].dinner_amount)}</span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">将写入 {parsed[0].date}（如该日期已有数据将被覆盖）</p>
+                    <p className="text-[11px] text-muted-foreground">将写入 {parsed.days[0].date}（如该日期已有数据将被覆盖）</p>
                   </>
                 ) : (
                   <>
-                    <p className="font-medium">解析结果：共 {parsed.length} 天，总 {parsed.reduce((s: number, d: any) => s + (d.people || 0), 0)} 人次</p>
+                    <p className="font-medium">解析结果：共 {parsed.days.length} 天，总 {parsed.days.reduce((s: number, d: any) => s + (d.people || 0), 0)} 人次</p>
                     <div className="max-h-40 overflow-y-auto rounded border bg-white">
                       <table className="w-full text-xs">
                         <thead><tr className="bg-slate-100">
@@ -398,7 +418,7 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
                           <th className="px-2 py-1 text-center">人次（午+晚）</th><th className="px-2 py-1 text-center">总额</th>
                         </tr></thead>
                         <tbody>
-                          {parsed.map((d: any) => (
+                          {parsed.days.map((d: any) => (
                             <tr key={d.date} className="border-t">
                               <td className="px-2 py-1 text-center">{d.date}</td>
                               <td className="px-2 py-1 text-center">{d.breakfast_count}次/{fmt(d.breakfast_amount)}</td>
