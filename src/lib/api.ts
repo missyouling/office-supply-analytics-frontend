@@ -150,6 +150,7 @@ export const canteenApi = {
     list: (params?: any) => req<PaginatedResult<any>>(C + '/expenses' + qs(params || {})),
     create: (data: any) => req<ApiResponse>(C + '/expenses', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: any) => req<ApiResponse>(C + '/expenses/' + id, { method: 'PUT', body: JSON.stringify(data) }),
+    upsert: (data: any) => req<ApiResponse>(C + '/expenses/upsert', { method: 'POST', body: JSON.stringify(data) }),
     delete: (id: number) => req<ApiResponse>(C + '/expenses/' + id, { method: 'DELETE' }),
   },
   // 每日收入
