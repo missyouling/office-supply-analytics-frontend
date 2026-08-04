@@ -467,7 +467,7 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
           <DialogHeader><DialogTitle>导入刷卡数据</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">选择刷卡机导出的 CSV 文件（支持「消费流水明细」或「个人餐别统计」，GBK/UTF-8 均可）</label>
+              <label className="text-xs text-muted-foreground">选择刷卡机导出的 CSV 文件（支持「消费流水明细」）</label>
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
