@@ -114,21 +114,24 @@ export default function AnalyticsTab() {
     const income = d.income || 0;
     const breakfast = d.breakfast || 0;
     const resource = d.resource || 0;
+    const consume = (d.lunch || 0) + (d.dinner || 0); // 消费收入 = 午餐+晚餐
     const totalExpense = purchase + share;
     // 人均成本 = (采购支出 + 分摊支出 - 早餐收入 - 资源占用费收入) / 当日消费总人次
     const costPerCapita = d.count ? ((purchase + share - breakfast - resource) / d.count) : 0;
     return {
-      序号: i + 1, 日期: d.date, 收入: income, 采购支出: purchase, 分摊支出: share,
+      序号: i + 1, 日期: d.date, 收入: income, 消费收入: consume, 早餐收入: breakfast, 资源费收入: resource,
+      采购支出: purchase, 分摊支出: share,
       盈亏: income - totalExpense, 人次: d.count || 0, 人均成本: d.count ? costPerCapita.toFixed(2) : '-',
     };
   });
   // 每日盈亏明细：底部每列汇总 + 整月人均成本
   const dailySummary = (() => {
     if (!dailyTable.length) return null;
-    const sumBill = (k: '收入' | '采购支出' | '分摊支出' | '盈亏' | '人次') => dailyTable.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+    const sumBill = (k: '收入' | '消费收入' | '早餐收入' | '资源费收入' | '采购支出' | '分摊支出' | '盈亏' | '人次') => dailyTable.reduce((s, r) => s + (Number(r[k]) || 0), 0);
     const perDayCosts = dailyTable.map((r) => Number(r.人均成本)).filter((v) => !isNaN(v));
     return {
-      收入: sumBill('收入'), 采购支出: sumBill('采购支出'), 分摊支出: sumBill('分摊支出'),
+      收入: sumBill('收入'), 消费收入: sumBill('消费收入'), 早餐收入: sumBill('早餐收入'), 资源费收入: sumBill('资源费收入'),
+      采购支出: sumBill('采购支出'), 分摊支出: sumBill('分摊支出'),
       盈亏: sumBill('盈亏'), 人次: sumBill('人次'),
       人均成本: perDayCosts.length ? (perDayCosts.reduce((a, b) => a + b, 0) / perDayCosts.length).toFixed(2) : '-',
     };
@@ -151,12 +154,21 @@ export default function AnalyticsTab() {
 
   // 打印预览每日盈亏明细
   const printDetail = () => {
-    const headers = ['序号', '日期', '收入', '采购支出', '分摊支出', '盈亏', '人次', '人均成本'];
+    const headers = ['序号', '日期', '消费收入', '早餐收入', '资源费收入', '总收入', '采购支出', '分摊支出', '盈亏', '人次', '人均成本'];
     const rows = dailyTable.map((r) => [
-      r.序号, r.日期, Number(r.收入).toFixed(2), Number(r.采购支出).toFixed(2), Number(r.分摊支出).toFixed(2),
+      r.序号, r.日期, Number(r.消费收入).toFixed(2), Number(r.早餐收入).toFixed(2), Number(r.资源费收入).toFixed(2),
+      Number(r.收入).toFixed(2), Number(r.采购支出).toFixed(2), Number(r.分摊支出).toFixed(2),
       Number(r.盈亏).toFixed(2), r.人次, r.人均成本 === '-' ? '-' : r.人均成本,
     ]);
-    const body = rows.map((r, i) => `<tr${i % 2 === 0 ? ' class="even"' : ''}>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('\n');
+    // 汇总行
+    if (dailySummary) {
+      rows.push([
+        '合计', `${dailyTable.length} 天`, Number(dailySummary.消费收入).toFixed(2), Number(dailySummary.早餐收入).toFixed(2), Number(dailySummary.资源费收入).toFixed(2),
+        Number(dailySummary.收入).toFixed(2), Number(dailySummary.采购支出).toFixed(2), Number(dailySummary.分摊支出).toFixed(2),
+        Number(dailySummary.盈亏).toFixed(2), dailySummary.人次, dailySummary.人均成本,
+      ]);
+    }
+    const body = rows.map((r, i) => `<tr${i % 2 === 0 ? ' class="even"' : ''}${i === rows.length - 1 && dailySummary ? ' class="total"' : ''}>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('\n');
     const html = `<!doctype html>
 <html><head><meta charset="utf-8"><title>每日盈亏明细（${month}）</title>
 <style>
@@ -167,8 +179,9 @@ table{width:100%;border-collapse:collapse;margin-bottom:16px}
 th{background:#1e40af;color:#fff;padding:8px 6px;text-align:center;font-size:13px}
 td{padding:7px 6px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center}
 tr.even td{background:#f8fafc}
+tr.total td{background:#dbeafe;font-weight:bold}
 .formula{background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:10px 14px;font-size:13px;line-height:1.9;color:#0c4a6e}
-@media print{body{padding:15px 25px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media print{body{padding:15px 25px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}tr.total td{background:#dbeafe!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head><body>
 <h1>每日盈亏明细（${month}）</h1>
 <table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>
@@ -195,7 +208,13 @@ ${body}
       c.month, Number(c.totalIncome).toFixed(2), Number(c.food).toFixed(2), Number(c.other).toFixed(2),
       Number(c.profit).toFixed(2), c.count || 0, c.perCapita || 0,
     ]);
-    const body = rows.map((r, i) => `<tr${i % 2 === 0 ? ' class="even"' : ''}>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('\n');
+    // 汇总行
+    if (compareData.length > 0) {
+      const s = (k: string) => compareData.reduce((acc: number, c: any) => acc + (Number(c[k]) || 0), 0);
+      const income = s('totalIncome'), count = s('count');
+      rows.push(['合计', income.toFixed(2), s('food').toFixed(2), s('other').toFixed(2), s('profit').toFixed(2), count, count ? (income / count).toFixed(2) : 0]);
+    }
+    const body = rows.map((r, i) => `<tr${i % 2 === 0 ? ' class="even"' : ''}${i === rows.length - 1 && compareData.length > 0 ? ' class="total"' : ''}>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('\n');
     const html = `<!doctype html>
 <html><head><meta charset="utf-8"><title>月度对比明细（${period === 'half' ? `${range.from} 至 ${range.to}` : year}）</title>
 <style>
@@ -206,7 +225,8 @@ table{width:100%;border-collapse:collapse;margin-bottom:16px}
 th{background:#1e40af;color:#fff;padding:8px 6px;text-align:center;font-size:13px}
 td{padding:7px 6px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center}
 tr.even td{background:#f8fafc}
-@media print{body{padding:15px 25px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+tr.total td{background:#dbeafe;font-weight:bold}
+@media print{body{padding:15px 25px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}tr.total td{background:#dbeafe!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head><body>
 <h1>月度对比明细（${period === 'half' ? `${range.from} 至 ${range.to}` : year}）</h1>
 <table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>
@@ -346,19 +366,23 @@ ${body}
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12 text-center">序号</TableHead><TableHead className="w-28 text-center">日期</TableHead>
-                    <TableHead className="w-28 text-center">收入</TableHead>
+                    <TableHead className="w-28 text-center">消费收入</TableHead><TableHead className="w-28 text-center">早餐收入</TableHead>
+                    <TableHead className="w-28 text-center">资源费收入</TableHead><TableHead className="w-28 text-center">总收入</TableHead>
                     <TableHead className="w-28 text-center">采购支出</TableHead><TableHead className="w-28 text-center">分摊支出</TableHead>
                     <TableHead className="w-28 text-center">盈亏</TableHead><TableHead className="w-20 text-center">人次</TableHead><TableHead className="w-28 text-center">人均成本</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {dailyTable.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="h-16 text-center text-muted-foreground">本月无记录</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={11} className="h-16 text-center text-muted-foreground">本月无记录</TableCell></TableRow>
                   ) : dailyTable.map((r) => (
                     <TableRow key={r.序号}>
                       <TableCell className="text-center text-muted-foreground">{r.序号}</TableCell>
                       <TableCell className="text-center">{r.日期}</TableCell>
-                      <TableCell className="text-green-600 text-center">{fmt(r.收入)}</TableCell>
+                      <TableCell className="text-green-600 text-center">{fmt(r.消费收入)}</TableCell>
+                      <TableCell className="text-green-600 text-center">{r.早餐收入 ? fmt(r.早餐收入) : '-'}</TableCell>
+                      <TableCell className="text-green-600 text-center">{r.资源费收入 ? fmt(r.资源费收入) : '-'}</TableCell>
+                      <TableCell className="text-green-700 font-medium text-center">{fmt(r.收入)}</TableCell>
                       <TableCell className="text-center">{r.采购支出 ? fmt(r.采购支出) : '-'}</TableCell>
                       <TableCell className="text-amber-600 text-center">{r.分摊支出 ? fmt(r.分摊支出) : '-'}</TableCell>
                       <TableCell className={`font-medium text-center ${r.盈亏 >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(r.盈亏)}</TableCell>
@@ -370,7 +394,10 @@ ${body}
                     <TableRow className="bg-blue-50/70 font-semibold">
                       <TableCell className="text-center text-blue-900">合计</TableCell>
                       <TableCell className="text-center text-blue-900">{dailyTable.length} 天</TableCell>
-                      <TableCell className="text-green-700 text-center">{fmt(dailySummary.收入)}</TableCell>
+                      <TableCell className="text-green-700 text-center">{fmt(dailySummary.消费收入)}</TableCell>
+                      <TableCell className="text-green-700 text-center">{fmt(dailySummary.早餐收入)}</TableCell>
+                      <TableCell className="text-green-700 text-center">{fmt(dailySummary.资源费收入)}</TableCell>
+                      <TableCell className="text-green-800 text-center">{fmt(dailySummary.收入)}</TableCell>
                       <TableCell className="text-center text-blue-900">{fmt(dailySummary.采购支出)}</TableCell>
                       <TableCell className="text-amber-700 text-center">{fmt(dailySummary.分摊支出)}</TableCell>
                       <TableCell className={`font-semibold text-center ${dailySummary.盈亏 >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{fmt(dailySummary.盈亏)}</TableCell>
@@ -487,6 +514,22 @@ ${body}
                         <TableCell className="text-center">{c.perCapita || '-'}</TableCell>
                       </TableRow>
                     ))}
+                    {compareData.length > 0 && (() => {
+                      const s = (k: string) => compareData.reduce((acc: number, c: any) => acc + (Number(c[k]) || 0), 0);
+                      const income = s('totalIncome'), food = s('food'), other = s('other'), profit = s('profit'), count = s('count');
+                      const perCapita = count ? (income / count).toFixed(2) : '-';
+                      return (
+                        <TableRow className="bg-blue-50/70 font-semibold">
+                          <TableCell className="text-center text-blue-900">合计</TableCell>
+                          <TableCell className="text-green-700 text-center">{fmt(income)}</TableCell>
+                          <TableCell className="text-center text-blue-900">{fmt(food)}</TableCell>
+                          <TableCell className="text-center text-blue-900">{fmt(other)}</TableCell>
+                          <TableCell className={`font-semibold text-center ${profit >= 0 ? 'text-blue-700' : 'text-red-700'}`}>{fmt(profit)}</TableCell>
+                          <TableCell className="text-center text-blue-900">{count}</TableCell>
+                          <TableCell className="text-center text-blue-900">{perCapita}</TableCell>
+                        </TableRow>
+                      );
+                    })()}
                   </TableBody>
                 </Table>
               </CardContent>

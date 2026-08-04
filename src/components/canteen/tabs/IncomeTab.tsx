@@ -413,6 +413,24 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
                 </TableCell>
               </TableRow>
             ))}
+            {list.length > 0 && (() => {
+              const s = (k: string) => list.reduce((acc: number, d: any) => acc + (Number(d[k]) || 0), 0);
+              const lunchC = s('lunch_count'), dinnerC = s('dinner_count');
+              return (
+                <TableRow className="bg-blue-50/70 font-semibold">
+                  <TableCell className="text-center text-blue-900" colSpan={2}>合计</TableCell>
+                  <TableCell className="text-center text-blue-900">{s('breakfast_count')}</TableCell>
+                  <TableCell className="text-center text-blue-900">{fmt(s('breakfast_amount'))}</TableCell>
+                  <TableCell className="text-center text-blue-900">{lunchC}</TableCell>
+                  <TableCell className="text-center text-blue-900">{fmt(s('lunch_amount'))}</TableCell>
+                  <TableCell className="text-center text-blue-900">{dinnerC}</TableCell>
+                  <TableCell className="text-center text-blue-900">{fmt(s('dinner_amount'))}</TableCell>
+                  <TableCell className="text-center text-blue-900">{lunchC + dinnerC}</TableCell>
+                  <TableCell className="font-medium text-red-700 text-center">{fmt(s('total_amount'))}</TableCell>
+                  <TableCell className="text-center text-blue-900"></TableCell>
+                </TableRow>
+              );
+            })()}
           </TableBody>
         </Table>
       </CardContent>
@@ -966,6 +984,19 @@ function RechargePanel() {
                   </td>
                 </tr>
               ))}
+              {list.length > 0 && (() => {
+                const sumAmt = list.reduce((s: number, r: any) => s + (Number(r.amount) || 0), 0);
+                const sumBal = list.reduce((s: number, r: any) => s + (Number(r.balance_recorded) || 0), 0);
+                return (
+                  <tr className="bg-blue-50/70 font-semibold">
+                    <td className="px-2 py-1.5 text-center text-blue-900" colSpan={6}>合计</td>
+                    <td className="px-2 py-1.5 text-center text-blue-900">{list.length} 笔</td>
+                    <td className="px-2 py-1.5 text-center font-medium text-green-700">{fmt(sumAmt)}</td>
+                    <td className="px-2 py-1.5 text-center text-blue-900">{fmt(sumBal)}</td>
+                    <td className="px-2 py-1.5 text-center text-blue-900" colSpan={3}></td>
+                  </tr>
+                );
+              })()}
             </tbody>
           </table>
           {loadingMore && <div className="py-2 text-center text-xs text-muted-foreground">加载中…</div>}
