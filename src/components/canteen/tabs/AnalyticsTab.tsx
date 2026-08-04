@@ -149,7 +149,7 @@ export default function AnalyticsTab() {
     totalIncome: (c.income || 0) + (c.resource || 0),
     expense: (c.food || 0) + (c.other || 0),
     profit: (c.income || 0) + (c.resource || 0) - (c.food || 0) - (c.other || 0),
-    perCapita: c.count ? ((c.income || 0) / c.count).toFixed(2) : 0,
+    perCapita: c.perCapita ?? 0, // 后端已按「每日人均成本平均」口径计算，与月度明细一致
   }));
 
   // 打印预览每日盈亏明细
@@ -212,7 +212,9 @@ ${body}
     if (compareData.length > 0) {
       const s = (k: string) => compareData.reduce((acc: number, c: any) => acc + (Number(c[k]) || 0), 0);
       const income = s('totalIncome'), count = s('count');
-      rows.push(['合计', income.toFixed(2), s('food').toFixed(2), s('other').toFixed(2), s('profit').toFixed(2), count, count ? (income / count).toFixed(2) : 0]);
+      const caps = compareData.map((c: any) => Number(c.perCapita)).filter((v: number) => v > 0);
+      const perCapita = caps.length ? (caps.reduce((a: number, b: number) => a + b, 0) / caps.length).toFixed(2) : 0;
+      rows.push(['合计', income.toFixed(2), s('food').toFixed(2), s('other').toFixed(2), s('profit').toFixed(2), count, perCapita]);
     }
     const body = rows.map((r, i) => `<tr${i % 2 === 0 ? ' class="even"' : ''}${i === rows.length - 1 && compareData.length > 0 ? ' class="total"' : ''}>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('\n');
     const html = `<!doctype html>
@@ -517,7 +519,8 @@ ${body}
                     {compareData.length > 0 && (() => {
                       const s = (k: string) => compareData.reduce((acc: number, c: any) => acc + (Number(c[k]) || 0), 0);
                       const income = s('totalIncome'), food = s('food'), other = s('other'), profit = s('profit'), count = s('count');
-                      const perCapita = count ? (income / count).toFixed(2) : '-';
+                      const caps = compareData.map((c: any) => Number(c.perCapita)).filter((v: number) => v > 0);
+                      const perCapita = caps.length ? (caps.reduce((a: number, b: number) => a + b, 0) / caps.length).toFixed(2) : '-';
                       return (
                         <TableRow className="bg-blue-50/70 font-semibold">
                           <TableCell className="text-center text-blue-900">合计</TableCell>

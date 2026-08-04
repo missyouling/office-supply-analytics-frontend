@@ -24,9 +24,15 @@ function PurchasePanel() {
   const [loadingMore, setLoadingMore] = useState(false);
   const limit = 50;
   const scrollRef = useRef<HTMLDivElement>(null);
-  // 日期范围筛选（默认空 = 显示全部采购数据）
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  // 月份筛选（默认当月）
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  // 由月份计算起止日期
+  const monthRange = (() => {
+    if (!month) return { date_from: '', date_to: '' };
+    const [y, mo] = month.split('-').map(Number);
+    const dim = new Date(y, mo, 0).getDate();
+    return { date_from: `${month}-01`, date_to: `${month}-${String(dim).padStart(2, '0')}` };
+  })();
 
   // 新建/编辑采购单
   const [open, setOpen] = useState(false);
@@ -47,11 +53,11 @@ function PurchasePanel() {
   const load = useCallback(async () => {
     setPage(1);
     try {
-      const r = await canteenApi.purchases.list({ page: 1, limit, date_from: dateFrom, date_to: dateTo });
+      const r = await canteenApi.purchases.list({ page: 1, limit, date_from: monthRange.date_from, date_to: monthRange.date_to });
       setList(r.items); setTotal(r.total);
       if (scrollRef.current) scrollRef.current.scrollTop = 0;
     } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
-  }, [dateFrom, dateTo]);
+  }, [monthRange.date_from, monthRange.date_to]);
   useEffect(() => { load(); }, [load]);
 
   // 滚动加载更多
@@ -60,7 +66,7 @@ function PurchasePanel() {
     setLoadingMore(true);
     try {
       const next = page + 1;
-      const r = await canteenApi.purchases.list({ page: next, limit, date_from: dateFrom, date_to: dateTo });
+      const r = await canteenApi.purchases.list({ page: next, limit, date_from: monthRange.date_from, date_to: monthRange.date_to });
       setList((prev) => [...prev, ...r.items]); setTotal(r.total); setPage(next);
     } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
     finally { setLoadingMore(false); }
@@ -142,7 +148,7 @@ function PurchasePanel() {
         <td>${i + 1}</td><td>${p.order_no || ''}</td><td>${p.purchase_date || ''}</td><td>${p.supplier_name || '-'}</td>
         <td>${p.item_count || 0} 项</td><td class="num">${Number(p.total_amount || 0).toFixed(2)}</td><td class="num">${Number(p.actual_pay || 0).toFixed(2)}</td>
       </tr>`).join('');
-    const rangeText = (dateFrom || dateTo) ? `（${dateFrom || '最早'} 至 ${dateTo || '最新'}）` : '';
+    const rangeText = month ? `（${month}）` : '';
     const sumTotal = onlyList.reduce((s: number, p: any) => s + Number(p.total_amount || 0), 0);
     const sumPay = onlyList.reduce((s: number, p: any) => s + Number(p.actual_pay || 0), 0);
     const html = `<!doctype html>
@@ -242,9 +248,7 @@ ${rows}
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">食材采购</h3>
           <div className="flex gap-2 items-center">
-            <Input type="date" className="h-8 w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            <span className="text-xs text-muted-foreground">至</span>
-            <Input type="date" className="h-8 w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            <Input type="month" className="h-8 w-36" value={month} onChange={(e) => setMonth(e.target.value)} />
             <Button size="sm" variant="outline" onClick={() => printAll()}><Printer className="mr-1 h-4 w-4" />打印</Button>
             <Button size="sm" onClick={openNew}><Plus className="mr-1 h-4 w-4" />新建</Button>
           </div>
