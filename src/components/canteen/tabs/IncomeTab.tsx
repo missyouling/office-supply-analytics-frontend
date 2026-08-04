@@ -713,8 +713,16 @@ function RechargePanel() {
     setImporting(true);
     try {
       const r = await canteenApi.recharges.importCsv(fileRef.current.files[0], mode, mapping);
-      if (r.ok && r.data) setResult(r.data);
-      else showToast('导入失败', r.error || '未知错误', 'destructive');
+      if (r.ok && r.data) {
+        // 导入成功：提示结果并自动关闭弹窗
+        const d = r.data;
+        showToast(`✅ 导入完成：新增 ${d.inserted}，更新 ${d.updated}${d.skipped ? `，跳过 ${d.skipped}` : ''}${d.errors?.length ? `，失败 ${d.errors.length}` : ''}`);
+        setImportOpen(false);
+        setFileName(''); setCsvHeaders([]); setCsvPreview([]); setResult(null);
+        if (fileRef.current) fileRef.current.value = '';
+      } else {
+        showToast('导入失败', r.error || '未知错误', 'destructive');
+      }
       load();
     } catch (e: any) { showToast('导入失败', e.message, 'destructive'); }
     finally { setImporting(false); }
