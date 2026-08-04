@@ -378,7 +378,7 @@ ${rows}
 function ExpensePanel() {
   const [list, setList] = useState<any[]>([]);
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [people, setPeople] = useState(0); // 当月早餐+晚餐总人次（自动从每日收入累加）
+  const [people, setPeople] = useState(0); // 当月午餐+晚餐总人次（自动从每日收入累加）
   const [summary, setSummary] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
 
@@ -403,7 +403,7 @@ function ExpensePanel() {
   };
   const days = elapsedDays(month);
 
-  // 水费 = 人均用水量(L→吨) × 当月用餐人次(早+晚) × 水单价
+  // 水费 = 人均用水量(L→吨) × 当月用餐人次(午+晚) × 水单价
   const waterAmount = people * (params.water_per_capita / 1000) * params.water_price;
   // 电费 = 用电量 × 天数
   const elecAmount = params.elec_usage * days;
@@ -423,8 +423,8 @@ function ExpensePanel() {
       const s: Record<string, number> = {};
       for (const it of r.items) s[it.category] = (s[it.category] || 0) + Number(it.amount || 0);
       setSummary(s);
-      // 用餐人次 = 早餐+晚餐 人次累加
-      const p = (inc.items || []).reduce((acc: number, d: any) => acc + (Number(d.breakfast_count) || 0) + (Number(d.dinner_count) || 0), 0);
+      // 用餐人次 = 午餐+晚餐 人次累加（早餐不计人次）
+      const p = (inc.items || []).reduce((acc: number, d: any) => acc + (Number(d.lunch_count) || 0) + (Number(d.dinner_count) || 0), 0);
       setPeople(p);
       // 回显已保存参数（remark 存 JSON）
       const find = (cat: string) => r.items.find((e: any) => e.category === cat);
@@ -469,7 +469,7 @@ function ExpensePanel() {
         {/* 汇总 */}
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="bg-blue-50 text-blue-700 rounded px-2 py-1">月费用合计 <b>{fmt(total)}</b></span>
-          <span className="bg-slate-100 rounded px-2 py-1">用餐人次（早+晚）{people}</span>
+          <span className="bg-slate-100 rounded px-2 py-1">用餐人次（午+晚）{people}</span>
           <span className="bg-slate-100 rounded px-2 py-1">计费天数 {days}</span>
         </div>
         <Table className="max-h-[45vh]">
