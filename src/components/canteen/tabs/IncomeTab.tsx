@@ -48,27 +48,48 @@ function parseMealCsv(text: string, fallbackDate: string): { hasDate: boolean; d
   const dCnt = findCol('晚餐', '次数'), dAmt = findCol('晚餐', '金额');
   if (bCnt < 0 || lCnt < 0 || dCnt < 0) return null;
 
-  // 日期列：宽泛识别（日期/时间/date/日/用餐/消费），多日文件每行带日期
+  // 日期列：先按表头名识别（日期/时间/date/日/用餐/消费）
   let dateIdx = header.findIndex((h) => /日期|时间|date|日/.test(h));
-  // 兼容日期列名带 | 或空格（如"用餐|日期"）
   if (dateIdx < 0) dateIdx = header.findIndex((h) => /用餐|消费|统计/.test(h) && /日|date/.test(h));
-  // 多格式日期解析：YYYY-MM-DD / YYYY/M/D / YYYYMMDD / YYYY年M月D日 / M月D日
+
+  // 多格式日期解析：YYYY-MM-DD / YYYY/M/D / YYYYMMDD / YYYY年M月D日 / M月D日 / YYYYMMDDHHMMSS
   const parseDate = (v: string): string => {
-    const s = String(v || '').trim();
+    const s = String(v || '').trim().replace(/[年月]/g, (m) => (m === '年' ? '-' : '-')).replace(/日/g, '');
     let m = s.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-    if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
-    m = s.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
     if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
     m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
     if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-    m = s.match(/(\d{1,2})月(\d{1,2})日/);
+    m = s.match(/(\d{4})(\d{2})(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = s.match(/(\d{1,2})-(\d{1,2})$/);
     if (m) {
       const now = new Date();
-      const y = now.getFullYear();
-      return `${y}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
+      return `${now.getFullYear()}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
     }
     return '';
   };
+
+  // 若表头未识别到日期列，扫描数据行内容自动探测：统计每列能解析为日期的行数，取命中率最高的列
+  if (dateIdx < 0) {
+    const colHits: number[] = [];
+    let sampleRows = 0;
+    for (let i = 1; i < Math.min(lines.length, 15); i++) {
+      const cols = parseLine(lines[i]);
+      const first = cols[0] || '';
+      if (/汇总|合计|总计|小计/.test(first)) continue;
+      if (cols.every((c) => c === '')) continue;
+      sampleRows++;
+      cols.forEach((c, ci) => {
+        if (parseDate(c)) colHits[ci] = (colHits[ci] || 0) + 1;
+      });
+    }
+    if (sampleRows > 0) {
+      let best = -1, bestHit = 0;
+      colHits.forEach((h, ci) => { if (h > bestHit) { bestHit = h; best = ci; } });
+      // 命中过半才认定是日期列，避免误判数字列（如工号/次数）
+      if (best >= 0 && bestHit >= Math.ceil(sampleRows / 2)) dateIdx = best;
+    }
+  }
 
   const num = (v: string): number => {
     const n = parseFloat(String(v || '').replace(/[￥¥,\s]/g, ''));
@@ -106,6 +127,74 @@ function parseMealCsv(text: string, fallbackDate: string): { hasDate: boolean; d
     days: Array.from(byDate.entries())
       .map(([date, g]) => ({ date, ...g }))
       .sort((a, b) => (a.date < b.date ? -1 : 1)),
+  };
+}
+
+// ---------- CSV 解析二：刷卡消费流水明细（含消费时间/金额）----------
+// 表头示例：工号,姓名,卡号,部门名称,消费时间,消费金额,卡余额,卡流水号,机号,机器流水号,标志
+// 数据行：每人每次刷卡一行；金额 1 元=早餐，5/10 元等=午/晚餐（按消费时间区分：<14点午餐，>=14点晚餐）
+function parseConsumptionCsv(text: string): { hasDate: boolean; days: MealDay[] } | null {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return null;
+  const parseLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (ch === ',' && !inQ) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map((s) => s.trim().replace(/^"|"$/g, ''));
+  };
+  const header = parseLine(lines[0]).map((h) => h.toLowerCase());
+  // 识别列：消费时间 / 消费金额（兼容"时间"、"金额"、"消费金额"）
+  const timeIdx = header.findIndex((h) => /消费时间|时间|datetime|date/.test(h));
+  const amtIdx = header.findIndex((h) => /消费金额|金额|amount/.test(h));
+  if (timeIdx < 0 || amtIdx < 0) return null;
+  const parseDate = (v: string): string => {
+    const m = String(v || '').match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (!m) return '';
+    return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+  };
+  const num = (v: string): number => {
+    const n = parseFloat(String(v || '').replace(/[￥¥,\s]/g, ''));
+    return isNaN(n) ? 0 : n;
+  };
+  const byDate = new Map<string, MealDay>();
+  let hasAnyDate = false;
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseLine(lines[i]);
+    if (cols.every((c) => c === '')) continue;
+    const date = parseDate(cols[timeIdx]);
+    if (!date) continue; // 无日期行跳过（如充值/退款）
+    hasAnyDate = true;
+    const amt = num(cols[amtIdx]);
+    // 金额 <= 1.5 视为早餐（1 元/次），否则按时间分午/晚餐；异常大额（充值等）跳过
+    if (amt > 50) continue;
+    if (!byDate.has(date)) byDate.set(date, { date, breakfast_count: 0, breakfast_amount: 0, lunch_count: 0, lunch_amount: 0, dinner_count: 0, dinner_amount: 0, people: 0 });
+    const g = byDate.get(date)!;
+    const timeStr = String(cols[timeIdx] || '');
+    const hour = parseInt(timeStr.slice(11, 13), 10);
+    if (amt <= 1.5) {
+      g.breakfast_count += 1;
+      g.breakfast_amount += amt;
+    } else if (!isNaN(hour) && hour >= 14) {
+      g.dinner_count += 1;
+      g.dinner_amount += amt;
+    } else {
+      g.lunch_count += 1;
+      g.lunch_amount += amt;
+    }
+    g.people += 1;
+  }
+  if (byDate.size === 0) return null;
+  return {
+    hasDate: hasAnyDate,
+    days: Array.from(byDate.values()).sort((a, b) => (a.date < b.date ? -1 : 1)),
   };
 }
 
@@ -198,8 +287,9 @@ function IncomePanel() {
     setFileName(f.name); setParsed(null);
     try {
       const text = await readCsvFile(f);
-      const r = parseMealCsv(text, new Date().toISOString().slice(0, 10));
-      if (!r) { showToast('解析失败', '未识别到早餐/中餐/晚餐列，请确认是餐别统计导出文件', 'destructive'); return; }
+      // 优先按"消费流水明细"解析（含消费时间/消费金额列），失败再按"个人餐别统计"解析
+      const r = parseConsumptionCsv(text) || parseMealCsv(text, new Date().toISOString().slice(0, 10));
+      if (!r) { showToast('解析失败', '未识别到早餐/中餐/晚餐列，请确认是餐别统计或消费明细导出文件', 'destructive'); return; }
       setParsed(r);
     } catch (e: any) { showToast('读取失败', e.message, 'destructive'); }
   };
