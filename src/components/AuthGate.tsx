@@ -53,8 +53,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-2xl">
+    <div
+      className="relative flex min-h-screen items-center justify-center"
+      style={{
+        backgroundImage: `url(https://random.mozuiapp.com/?day=random&t=${Date.now()})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      {/* 半透明遮罩，保证卡片可读 */}
+      <div className="absolute inset-0 bg-black/45" />
+      <div className="relative w-full max-w-sm rounded-xl bg-white/95 p-8 shadow-2xl backdrop-blur-sm">
         <div className="mb-2 flex justify-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-600 text-xl font-bold text-white">🍚</div>
         </div>
