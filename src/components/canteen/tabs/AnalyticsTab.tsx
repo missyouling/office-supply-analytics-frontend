@@ -200,7 +200,7 @@ export default function AnalyticsTab() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                     <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip formatter={(v: any, n: any) => [fmt(v), n === 'income' ? '收入' : '支出']} />
+                    <Tooltip formatter={(v: any, n: any) => [fmt(v), n]} />
                     <Legend />
                     <Bar dataKey="income" name="收入" fill="#16a34a" />
                     <Bar dataKey="expense" name="支出" fill="#dc2626" />
@@ -327,7 +327,7 @@ export default function AnalyticsTab() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                       <YAxis tick={{ fontSize: 10 }} />
-                      <Tooltip formatter={(v: any, n: any) => [fmt(v), n === 'income' ? '收入' : n === 'expense' ? '支出' : '盈亏']} />
+                      <Tooltip formatter={(v: any, n: any) => [fmt(v), n]} />
                       <Legend />
                       <Bar dataKey="totalIncome" name="收入" fill="#16a34a" />
                       <Bar dataKey="expense" name="支出" fill="#dc2626" />
