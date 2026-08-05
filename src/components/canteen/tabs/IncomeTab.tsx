@@ -132,7 +132,7 @@ function parseMealCsv(text: string, fallbackDate: string): { hasDate: boolean; d
 
 // ---------- CSV 解析二：刷卡消费流水明细（含消费时间/金额）----------
 // 表头示例：工号,姓名,卡号,部门名称,消费时间,消费金额,卡余额,卡流水号,机号,机器流水号,标志
-// 数据行：每人每次刷卡一行；金额 1 元=早餐，5/10 元等=午/晚餐（按消费时间区分：<14点午餐，>=14点晚餐）
+// 数据行：每人每次刷卡一行；早餐/午餐/晚餐全部按消费时间判定（不看金额）：早餐 <10:00，午餐 10:00-13:59，晚餐 >=14:00
 function parseConsumptionCsv(text: string): { hasDate: boolean; days: MealDay[] } | null {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return null;
@@ -173,21 +173,23 @@ function parseConsumptionCsv(text: string): { hasDate: boolean; days: MealDay[] 
     if (!date) continue; // 无日期行跳过（如充值/退款）
     hasAnyDate = true;
     const amt = num(cols[amtIdx]);
-    // 金额 <= 1.5 视为早餐（1 元/次），否则按时间分午/晚餐；异常大额（充值等）跳过
+    // 异常大额（充值/退款等）跳过
     if (amt > 50) continue;
     if (!byDate.has(date)) byDate.set(date, { date, breakfast_count: 0, breakfast_amount: 0, lunch_count: 0, lunch_amount: 0, dinner_count: 0, dinner_amount: 0, people: 0 });
     const g = byDate.get(date)!;
+    // 早/午/晚餐全部按消费时间判定（不看金额）：早餐 <10:00，午餐 10:00-13:59，晚餐 >=14:00
     const timeStr = String(cols[timeIdx] || '');
     const hour = parseInt(timeStr.slice(11, 13), 10);
-    if (amt <= 1.5) {
+    if (isNaN(hour)) continue;
+    if (hour < 10) {
       g.breakfast_count += 1;
       g.breakfast_amount += amt;
-    } else if (!isNaN(hour) && hour >= 14) {
-      g.dinner_count += 1;
-      g.dinner_amount += amt;
-    } else {
+    } else if (hour < 14) {
       g.lunch_count += 1;
       g.lunch_amount += amt;
+    } else {
+      g.dinner_count += 1;
+      g.dinner_amount += amt;
     }
     g.people += 1;
   }
@@ -512,7 +514,7 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
             <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs leading-5 text-blue-900">
               <p className="font-semibold mb-1">📄 导入说明</p>
               <p>支持刷卡机导出的「消费流水明细」CSV（每行 = 一次刷卡记录），GBK/UTF-8 编码均可。</p>
-              <p>金额 1 元 = 早餐（刷几次算几次）；5/10 元等按消费时间自动区分：14:00 前为午餐、14:00 后为晚餐。</p>
+              <p>早餐/午餐/晚餐全部按消费时间自动判定（不看金额）：10:00 前为早餐，10:00-13:59 为午餐，14:00 起为晚餐。</p>
               <p>按消费时间中的日期自动分组写入，无需选择导入日期；同日期重复导入将覆盖更新。</p>
             </div>
             <div className="flex items-center justify-between">
