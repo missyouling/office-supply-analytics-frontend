@@ -9,6 +9,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [pw, setPw] = useState('');
   const [err, setErr] = useState(false);
   const [checking, setChecking] = useState(false);
+  // 背景随机图 URL 只计算一次（避免每次输入字符重渲染刷新图片）
+  const [bgUrl] = useState(() => `https://random.mozuiapp.com/?day=random&t=${Date.now()}`);
 
   // 检查服务端是否启用认证（若未启用则直接放行）
   useEffect(() => {
@@ -56,7 +58,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     <div
       className="relative flex min-h-screen items-center justify-center"
       style={{
-        backgroundImage: `url(https://random.mozuiapp.com/?day=random&t=${Date.now()})`,
+        backgroundImage: `url(${bgUrl})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',

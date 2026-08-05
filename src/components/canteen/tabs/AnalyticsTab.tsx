@@ -181,10 +181,12 @@ export default function AnalyticsTab() {
   const printCostSummary = () => {
     const arr = period === 'month' ? (costSummary?.daily || []) : costItems;
     if (!arr.length) return;
-    const headers = period === 'month' ? ['序号', '日期', '肉类', '蔬菜', '干杂', '充值', '消费', '退费', '盈亏'] : ['序号', '月份', '肉类', '蔬菜', '干杂', '充值', '消费', '退费', '盈亏', '人均'];
+    const base = ['序号', period === 'month' ? '日期' : '月份', '肉类', '蔬菜', '干杂', '粮油', '调味品', '充值', '消费', '退费', '盈亏'];
+    const headers = period === 'month' ? base : [...base, '人均'];
     const rows = arr.map((c: any, i: number) => [
       i + 1, period === 'month' ? (c.date || '').slice(5) : c.month,
       Number(c.meat).toFixed(2), Number(c.vegetable).toFixed(2), Number(c.dry).toFixed(2),
+      Number(c.grain).toFixed(2), Number(c.condiment).toFixed(2),
       Number(c.recharge).toFixed(2), Number(c.consume).toFixed(2), Number(c.refund).toFixed(2),
       Number(c.profit).toFixed(2),
       ...(period !== 'month' ? [Number(c.perCapita || 0).toFixed(2)] : []),
@@ -193,10 +195,10 @@ export default function AnalyticsTab() {
     const s = (k: string) => arr.reduce((acc: number, c: any) => acc + (Number(c[k]) || 0), 0);
     const caps = arr.map((c: any) => Number(c.perCapita)).filter((v: number) => v > 0);
     rows.push(['合计', `${arr.length} 天`, s('meat').toFixed(2), s('vegetable').toFixed(2), s('dry').toFixed(2),
+      s('grain').toFixed(2), s('condiment').toFixed(2),
       s('recharge').toFixed(2), s('consume').toFixed(2), s('refund').toFixed(2), s('profit').toFixed(2),
       ...(period !== 'month' ? [caps.length ? (caps.reduce((a: number, b: number) => a + b, 0) / caps.length).toFixed(2) : '0.00'] : [])]);
     const body = rows.map((r: any[], i: number) => `<tr${i % 2 === 0 ? ' class="even"' : ''}${i === rows.length - 1 ? ' class="total"' : ''}>${r.map((v: any) => `<td>${v}</td>`).join('')}</tr>`).join('\n');
-    const title = period === 'month' ? `食堂月度费用汇总（${month} 按日）` : '食堂月度费用汇总（按月）';
     const html = `<!doctype html>
 <html><head><meta charset="utf-8"><title>月度费用汇总</title>
 <style>
@@ -211,12 +213,12 @@ tr.even td{background:#f8fafc}
 tr.total td{background:#dbeafe;font-weight:bold}
 @media print{body{padding:15px 25px}th{background:#1e40af!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}tr.total td{background:#dbeafe!important}}
 </style></head><body>
-<h1>${title}</h1>
+<h1>食堂月度费用汇总</h1>
 <p class="meta">统计范围：${arr[0]?.date || arr[0]?.month || ''} 至 ${arr[arr.length - 1]?.date || arr[arr.length - 1]?.month || ''}</p>
 <table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>
 ${body}
 </tbody></table>
-<p class="meta">肉类/蔬菜/干杂 = 当日食材采购按分类汇总；充值 = 饭卡充值总额；消费 = 午餐+晚餐刷卡金额；退费 = 饭卡退费总额；盈亏 = 收入（餐费+资源占用费）− 支出（食材采购+其他费用分摊+退费）${period === 'month' ? '' : '；人均 = 每日人均成本平均'}</p>
+<p class="meta">肉类/蔬菜/干杂/粮油/调味品 = 当日食材采购按分类汇总；充值 = 饭卡充值总额；消费 = 早餐+午餐+晚餐刷卡金额；退费 = 饭卡退费总额（不参与盈亏）；盈亏 = 收入（餐费+资源占用费）− 支出（食材采购+其他费用分摊），与每日盈亏明细口径一致${period === 'month' ? '' : '；人均 = 每日人均成本平均'}</p>
 </body></html>`;
     const w = window.open('', '_blank');
     if (!w) { showToast('浏览器拦截了打印窗口', '', 'destructive'); return; }
@@ -228,12 +230,14 @@ ${body}
   const exportCostSummary = () => {
     const arr = period === 'month' ? (costSummary?.daily || []) : costItems;
     if (!arr.length) return;
-    const header = period === 'month' ? ['序号', '日期', '肉类', '蔬菜', '干杂', '充值', '消费', '退费', '盈亏'] : ['序号', '月份', '肉类', '蔬菜', '干杂', '充值', '消费', '退费', '盈亏', '人均'];
+    const base = ['序号', period === 'month' ? '日期' : '月份', '肉类', '蔬菜', '干杂', '粮油', '调味品', '充值', '消费', '退费', '盈亏'];
+    const header = period === 'month' ? base : [...base, '人均'];
     const lines = [
       header.join(','),
       ...arr.map((c: any, i: number) => [
         i + 1, period === 'month' ? (c.date || '').slice(5) : c.month,
         Number(c.meat).toFixed(2), Number(c.vegetable).toFixed(2), Number(c.dry).toFixed(2),
+        Number(c.grain).toFixed(2), Number(c.condiment).toFixed(2),
         Number(c.recharge).toFixed(2), Number(c.consume).toFixed(2), Number(c.refund).toFixed(2),
         Number(c.profit).toFixed(2),
         ...(period !== 'month' ? [Number(c.perCapita || 0).toFixed(2)] : []),
@@ -522,23 +526,25 @@ ${body}
             </CardContent>
           </Card>
 
-          {/* 月度费用汇总（肉类/蔬菜/干杂/充值/消费/退费/盈亏/人均；月度视图按天、跨月按月） */}
+          {/* 月度费用汇总（肉类/蔬菜/干杂/粮油/调味品/充值/消费/退费/盈亏；月度视图按天、跨月按月） */}
           {(period === 'month' ? (costSummary?.daily?.length || 0) > 0 : costItems.length > 0) && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm">{period === 'month' ? `月度费用汇总（${month} 按日）` : '月度费用汇总（按月）'}</CardTitle>
+                <CardTitle className="text-sm">月度费用汇总</CardTitle>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={printCostSummary}><Printer className="mr-1 h-4 w-4" />打印</Button>
                   <Button size="sm" variant="outline" onClick={exportCostSummary}><Download className="mr-1 h-4 w-4" />导出</Button>
                 </div>
               </CardHeader>
-              <CardContent className="p-0 overflow-x-auto">
+              <CardContent className="p-0">
+                <div className="relative max-h-[45vh] overflow-y-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12 text-center">序号</TableHead>
                       <TableHead className="text-center">{period === 'month' ? '日期' : '月份'}</TableHead>
                       <TableHead className="text-center">肉类</TableHead><TableHead className="text-center">蔬菜</TableHead><TableHead className="text-center">干杂</TableHead>
+                      <TableHead className="text-center">粮油</TableHead><TableHead className="text-center">调味品</TableHead>
                       <TableHead className="text-center">充值</TableHead><TableHead className="text-center">消费</TableHead>
                       <TableHead className="text-center">退费</TableHead><TableHead className="text-center">盈亏</TableHead>
                       {period !== 'month' && <TableHead className="text-center">人均</TableHead>}
@@ -552,6 +558,8 @@ ${body}
                         <TableCell className="text-center">{fmt(c.meat)}</TableCell>
                         <TableCell className="text-center">{fmt(c.vegetable)}</TableCell>
                         <TableCell className="text-center">{fmt(c.dry)}</TableCell>
+                        <TableCell className="text-center">{fmt(c.grain)}</TableCell>
+                        <TableCell className="text-center">{fmt(c.condiment)}</TableCell>
                         <TableCell className="text-center text-green-600">{fmt(c.recharge)}</TableCell>
                         <TableCell className="text-center text-green-600">{fmt(c.consume)}</TableCell>
                         <TableCell className="text-center text-red-600">{fmt(c.refund)}</TableCell>
@@ -570,6 +578,8 @@ ${body}
                           <TableCell className="text-center text-blue-900">{fmt(s('meat'))}</TableCell>
                           <TableCell className="text-center text-blue-900">{fmt(s('vegetable'))}</TableCell>
                           <TableCell className="text-center text-blue-900">{fmt(s('dry'))}</TableCell>
+                          <TableCell className="text-center text-blue-900">{fmt(s('grain'))}</TableCell>
+                          <TableCell className="text-center text-blue-900">{fmt(s('condiment'))}</TableCell>
                           <TableCell className="text-center text-green-700">{fmt(s('recharge'))}</TableCell>
                           <TableCell className="text-center text-green-700">{fmt(s('consume'))}</TableCell>
                           <TableCell className="text-center text-red-700">{fmt(s('refund'))}</TableCell>
@@ -580,10 +590,11 @@ ${body}
                     })()}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
               <CardContent className="p-4 pt-2">
                 <div className="rounded-md bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-600">
-                  <p>月度视图按日展示当月 1 日至月末每一天的分类数据；跨月视图（半年度/年度）按月份汇总。肉类/蔬菜/干杂 = 当日食材采购按分类汇总；充值 = 饭卡充值总额；消费 = 午餐+晚餐刷卡金额；退费 = 饭卡退费总额；盈亏 = 收入（餐费+资源占用费）− 支出（食材采购+其他费用分摊+退费）；人均 = 每日人均成本平均（与每日盈亏明细口径一致）</p>
+                  <p>月度视图按日展示当月有数据的天；跨月视图（半年度/年度）按月份汇总。肉类/蔬菜/干杂/粮油/调味品 = 当日食材采购按分类汇总；充值 = 饭卡充值总额；消费 = 早餐+午餐+晚餐刷卡金额；退费 = 饭卡退费总额（不参与盈亏）；盈亏 = 收入（餐费+资源占用费）− 支出（食材采购+其他费用分摊），与每日盈亏明细口径一致；人均 = 每日人均成本平均</p>
                 </div>
               </CardContent>
             </Card>
