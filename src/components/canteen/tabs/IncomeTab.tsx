@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { showToast } from '@/components/ui/toaster';
 import { canteenApi } from '@/lib/api';
-import { Plus, Pencil, Trash2, Printer, Upload, X, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, Printer, Upload, X, Eye, Download } from 'lucide-react';
 
 const fmt = (n: any) => `¥${Number(n || 0).toFixed(2)}`;
 
@@ -310,12 +310,36 @@ function IncomePanel() {
         });
       }
       const totalPeople = days.reduce((s: number, d: any) => s + (d.people || 0), 0);
-      showToast(days.length > 1 ? `✅ 已导入 ${days.length} 天数据（${totalPeople} 人次）` : `✅ 已导入 ${days[0].people} 人数据到 ${days[0].date}`);
+      const totalAmt = days.reduce((s: number, d: any) => s + (d.breakfast_amount || 0) + (d.lunch_amount || 0) + (d.dinner_amount || 0), 0);
+      showToast(days.length > 1
+        ? `✅ 导入成功：${days.length} 天、${totalPeople} 人次、共 ${fmt(totalAmt)}（${days[0].date} 至 ${days[days.length - 1].date}）`
+        : `✅ 导入成功：${days[0].people} 人、共 ${fmt(totalAmt)}（${days[0].date}）`);
       setImportOpen(false); setParsed(null); setFileName('');
       // 跳转到数据所在月份（取第一天的月份；跨月数据保持当月视图由用户切换）
       setMonth((days[0].date || '').slice(0, 7)); load();
-    } catch (e: any) { showToast('导入失败', e.message, 'destructive'); }
+    } catch (e: any) {
+      // 失败：说明原因 + 处理方式
+      const msg = String(e?.message || e || '未知错误');
+      const hint = /网络|fetch|Failed/i.test(msg) ? '请检查网络后重试' : '请检查文件格式是否正确，或刷新页面后重试';
+      showToast(`导入失败：${msg}。${hint}`, '', 'destructive');
+    }
     finally { setImporting(false); }
+  };
+
+  // 下载刷卡数据导入模板（消费流水明细）
+  const downloadTemplate = () => {
+    const tpl = [
+      '工号,姓名,卡号,部门编号,部门名称,消费时间,消费金额,卡余额,卡流水号,机号,机器流水号,标志',
+      '100000019,叶茂,1000119,0101,生产部,2026-07-01 07:12:33,￥1.00,￥100.00,1,0,1,',
+      '100000019,叶茂,1000119,0101,生产部,2026-07-01 11:35:12,￥5.00,￥99.00,2,0,2,',
+      '100000019,叶茂,1000119,0101,生产部,2026-07-01 17:02:45,￥5.00,￥94.00,3,0,3,',
+    ].join('\n');
+    const blob = new Blob(['\ufeff' + tpl], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '刷卡消费明细导入模板.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   // ===== 查看/打印 =====
@@ -481,11 +505,22 @@ ${d.remark ? `<p style="margin-top:20px;color:#666;font-size:13px">备注：${d.
 
       {/* CSV 导入弹窗 */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="sm:max-w-[560px]">
           <DialogHeader><DialogTitle>导入刷卡数据</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
+            {/* 描述说明 */}
+            <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs leading-5 text-blue-900">
+              <p className="font-semibold mb-1">📄 导入说明</p>
+              <p>支持刷卡机导出的「消费流水明细」CSV（每行 = 一次刷卡记录），GBK/UTF-8 编码均可。</p>
+              <p>金额 1 元 = 早餐（刷几次算几次）；5/10 元等按消费时间自动区分：14:00 前为午餐、14:00 后为晚餐。</p>
+              <p>按消费时间中的日期自动分组写入，无需选择导入日期；同日期重复导入将覆盖更新。</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <Button size="sm" variant="outline" onClick={downloadTemplate}><Download className="mr-1 h-4 w-4" />下载模板</Button>
+              <span className="text-[11px] text-muted-foreground">可参考模板列：工号/姓名/卡号/部门/消费时间/消费金额/卡余额/流水号</span>
+            </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">选择刷卡机导出的 CSV 文件（支持「消费流水明细」）</label>
+              <label className="text-xs text-muted-foreground">选择刷卡机导出的 CSV 文件（支持中控消费机系统）</label>
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
@@ -910,16 +945,41 @@ function RechargePanel() {
       if (r.ok && r.data) {
         // 导入成功：提示结果并自动关闭弹窗
         const d = r.data;
-        showToast(`✅ 导入完成：新增 ${d.inserted}，更新 ${d.updated}${d.skipped ? `，跳过 ${d.skipped}` : ''}${d.errors?.length ? `，失败 ${d.errors.length}` : ''}`);
+        if (d.errors?.length) {
+          showToast(`⚠️ 导入完成：新增 ${d.inserted}、更新 ${d.updated}${d.skipped ? `、跳过 ${d.skipped}` : ''}，但有 ${d.errors.length} 行失败：${d.errors[0].reason}。请修正后重新导入`, '', 'destructive');
+        } else {
+          showToast(`✅ 导入成功：新增 ${d.inserted}${d.updated ? `、更新 ${d.updated}` : ''}${d.skipped ? `、跳过 ${d.skipped}` : ''} 笔充值记录`);
+        }
         setImportOpen(false);
         setFileName(''); setCsvHeaders([]); setCsvPreview([]); setResult(null);
         if (fileRef.current) fileRef.current.value = '';
       } else {
-        showToast('导入失败', r.error || '未知错误', 'destructive');
+        const msg = r.error || '未知错误';
+        const hint = /缺少必填列映射|列映射/i.test(msg) ? '请检查 CSV 表头是否与模板一致，必要时手动调整字段映射' : '请检查文件格式后重试';
+        showToast(`导入失败：${msg}。${hint}`, '', 'destructive');
       }
       load();
-    } catch (e: any) { showToast('导入失败', e.message, 'destructive'); }
+    } catch (e: any) {
+      const msg = String(e?.message || e || '未知错误');
+      const hint = /网络|fetch|Failed/i.test(msg) ? '请检查网络后重试' : '请检查文件格式是否正确，或刷新页面后重试';
+      showToast(`导入失败：${msg}。${hint}`, '', 'destructive');
+    }
     finally { setImporting(false); }
+  };
+
+  // 下载充值导入模板
+  const downloadTemplate = () => {
+    const tpl = [
+      '工号,姓名,卡号,部门编号,部门名称,充值时间,充值金额,卡余额,卡流水号,机号,操作员,账单号,类型',
+      '100000019,叶茂,1000119,0101,生产部,2026-07-01 09:00:00,￥100.00,￥100.00,1,0,管理员,1001,现金',
+      '100000020,张三,1000120,0102,销售部,2026-07-02 09:30:00,￥200.00,￥200.00,2,0,管理员,1002,现金',
+    ].join('\n');
+    const blob = new Blob(['\ufeff' + tpl], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '饭卡充值导入模板.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   return (
@@ -1007,11 +1067,23 @@ function RechargePanel() {
       {/* 导入弹窗 */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="sm:max-w-[680px] max-h-[85vh] flex flex-col">
-          <DialogHeader><DialogTitle>导入充值 CSV</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>导入充值数据</DialogTitle></DialogHeader>
           <div className="space-y-3 overflow-y-auto pr-1">
-            <div className="flex items-center gap-2">
+            {/* 描述说明 */}
+            <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs leading-5 text-blue-900">
+              <p className="font-semibold mb-1">📄 导入说明</p>
+              <p>支持刷卡机导出的「充值明细」CSV，GBK/UTF-8 编码均可；每行 = 一次充值记录。</p>
+              <p>系统自动按表头匹配字段（卡流水号唯一去重，重复导入按所选模式更新或跳过）；</p>
+              <p>导入后可在下方字段映射中手动调整匹配关系；同流水号重复充值会按模式处理。</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <Button size="sm" variant="outline" onClick={downloadTemplate}><Download className="mr-1 h-4 w-4" />下载模板</Button>
+              <span className="text-[11px] text-muted-foreground">模板列：工号/姓名/卡号/部门/充值时间/充值金额/卡余额/流水号/操作员</span>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">选择刷卡机导出的 CSV 文件（支持中控消费机系统）</label>
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
-              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload className="mr-1 h-4 w-4" />选择 CSV 文件</Button>
+              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload className="mr-1 h-4 w-4" />选择文件</Button>
               {fileName && <span className="text-xs text-muted-foreground">{fileName}</span>}
             </div>
 
@@ -1238,16 +1310,41 @@ function RefundPanel() {
       const r = await canteenApi.refunds.importCsv(fileRef.current.files[0], mode, mapping);
       if (r.ok && r.data) {
         const d = r.data;
-        showToast(`✅ 导入完成：新增 ${d.inserted}，更新 ${d.updated}${d.skipped ? `，跳过 ${d.skipped}` : ''}${d.errors?.length ? `，失败 ${d.errors.length}` : ''}`);
+        if (d.errors?.length) {
+          showToast(`⚠️ 导入完成：新增 ${d.inserted}、更新 ${d.updated}${d.skipped ? `、跳过 ${d.skipped}` : ''}，但有 ${d.errors.length} 行失败：${d.errors[0].reason}。请修正后重新导入`, '', 'destructive');
+        } else {
+          showToast(`✅ 导入成功：新增 ${d.inserted}${d.updated ? `、更新 ${d.updated}` : ''}${d.skipped ? `、跳过 ${d.skipped}` : ''} 笔退费记录`);
+        }
         setImportOpen(false);
         setFileName(''); setCsvHeaders([]); setCsvPreview([]); setResult(null);
         if (fileRef.current) fileRef.current.value = '';
       } else {
-        showToast('导入失败', r.error || '未知错误', 'destructive');
+        const msg = r.error || '未知错误';
+        const hint = /缺少必填列映射|列映射/i.test(msg) ? '请检查 CSV 表头是否与模板一致，必要时手动调整字段映射' : '请检查文件格式后重试';
+        showToast(`导入失败：${msg}。${hint}`, '', 'destructive');
       }
       load();
-    } catch (e: any) { showToast('导入失败', e.message, 'destructive'); }
+    } catch (e: any) {
+      const msg = String(e?.message || e || '未知错误');
+      const hint = /网络|fetch|Failed/i.test(msg) ? '请检查网络后重试' : '请检查文件格式是否正确，或刷新页面后重试';
+      showToast(`导入失败：${msg}。${hint}`, '', 'destructive');
+    }
     finally { setImporting(false); }
+  };
+
+  // 下载退费导入模板
+  const downloadTemplate = () => {
+    const tpl = [
+      '工号,姓名,卡号,部门编号,部门名称,退款金额,卡上余额,卡流水号,退款时间,机号,操作员,收支统计账单号',
+      '100000098,韩小勇,1000161,0105,生产部,￥10.00,￥0.00,81,2026-07-20 14:10:41,0,管理员,',
+      '100000099,李四,1000162,0106,销售部,￥20.00,￥5.00,82,2026-07-21 15:00:00,0,管理员,',
+    ].join('\n');
+    const blob = new Blob(['\ufeff' + tpl], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '饭卡退费导入模板.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   return (
@@ -1333,11 +1430,23 @@ function RefundPanel() {
       {/* 导入弹窗 */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="sm:max-w-[680px] max-h-[85vh] flex flex-col">
-          <DialogHeader><DialogTitle>导入退费 CSV</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>导入退费数据</DialogTitle></DialogHeader>
           <div className="space-y-3 overflow-y-auto pr-1">
-            <div className="flex items-center gap-2">
+            {/* 描述说明 */}
+            <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2.5 text-xs leading-5 text-blue-900">
+              <p className="font-semibold mb-1">📄 导入说明</p>
+              <p>支持刷卡机导出的「退款明细」CSV，GBK/UTF-8 编码均可；每行 = 一次退费记录。</p>
+              <p>系统自动按表头匹配字段（卡流水号唯一去重，重复导入按所选模式更新或跳过）；</p>
+              <p>导入后可在下方字段映射中手动调整匹配关系；退费金额用于月度费用汇总统计，不参与盈亏计算。</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <Button size="sm" variant="outline" onClick={downloadTemplate}><Download className="mr-1 h-4 w-4" />下载模板</Button>
+              <span className="text-[11px] text-muted-foreground">模板列：工号/姓名/卡号/部门/退款金额/卡上余额/流水号/退款时间/操作员</span>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">选择刷卡机导出的 CSV 文件（支持中控消费机系统）</label>
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
-              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload className="mr-1 h-4 w-4" />选择 CSV 文件</Button>
+              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload className="mr-1 h-4 w-4" />选择文件</Button>
               {fileName && <span className="text-xs text-muted-foreground">{fileName}</span>}
             </div>
 

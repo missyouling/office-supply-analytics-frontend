@@ -219,6 +219,7 @@ tr.total td{background:#dbeafe;font-weight:bold}
 ${body}
 </tbody></table>
 <p class="meta">肉类/蔬菜/干杂/粮油/调味品 = 当日食材采购按分类汇总；充值 = 饭卡充值总额；消费 = 早餐+午餐+晚餐刷卡金额；退费 = 饭卡退费总额（不参与盈亏）；盈亏 = 收入（餐费+资源占用费）− 支出（食材采购+其他费用分摊），与每日盈亏明细口径一致${period === 'month' ? '' : '；人均 = 每日人均成本平均'}</p>
+<script>setTimeout(()=>window.print(),300)</script>
 </body></html>`;
     const w = window.open('', '_blank');
     if (!w) { showToast('浏览器拦截了打印窗口', '', 'destructive'); return; }
