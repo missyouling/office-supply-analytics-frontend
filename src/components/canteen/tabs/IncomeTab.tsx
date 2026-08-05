@@ -1108,16 +1108,340 @@ function RechargePanel() {
   );
 }
 
+// ---------- 饭卡退费 ----------
+const REFUND_FIELDS = [
+  { key: 'external_sn', label: '流水号', required: true },
+  { key: 'user_name', label: '姓名', required: true },
+  { key: 'user_id', label: '工号' },
+  { key: 'user_department', label: '部门名称' },
+  { key: 'department_code', label: '部门编号' },
+  { key: 'card_no', label: '卡号' },
+  { key: 'refund_date', label: '退款日期', required: true, hint: '模板列：退款时间' },
+  { key: 'amount', label: '退款金额', required: true, hint: '模板列：退款金额' },
+  { key: 'balance_recorded', label: '卡上余额', hint: '模板列：卡上余额' },
+  { key: 'operator', label: '操作员' },
+  { key: 'machine_no', label: '机号' },
+  { key: 'bill_no', label: '账单号', hint: '模板列：收支统计账单号' },
+  { key: 'remark', label: '备注' },
+];
+
+function RefundPanel() {
+  const [list, setList] = useState<any[]>([]);
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [keyword, setKeyword] = useState('');
+  const [summary, setSummary] = useState<any>({ total: 0, count: 0, people: 0 });
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const limit = 50;
+  const [confirm, setConfirm] = useState<{ open: boolean; target: any }>({ open: false, target: null });
+
+  // 导入
+  const [importOpen, setImportOpen] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvPreview, setCsvPreview] = useState<string[][]>([]);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [mode, setMode] = useState<'upsert' | 'skip'>('upsert');
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const load = useCallback(async () => {
+    setPage(1);
+    try {
+      const [r, s] = await Promise.all([
+        canteenApi.refunds.list({ month, keyword, page: 1, limit }),
+        canteenApi.refunds.summary(month),
+      ]);
+      setList(r.items); setTotal(r.total); setSummary(s);
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
+  }, [month, keyword]);
+  useEffect(() => { load(); }, [load]);
+
+  const loadMore = async () => {
+    if (loadingMore || list.length >= total) return;
+    setLoadingMore(true);
+    try {
+      const next = page + 1;
+      const r = await canteenApi.refunds.list({ month, keyword, page: next, limit });
+      setList((prev) => [...prev, ...r.items]); setTotal(r.total); setPage(next);
+    } catch (e: any) { showToast('加载失败', e.message, 'destructive'); }
+    finally { setLoadingMore(false); }
+  };
+
+  const del = async () => {
+    if (!confirm.target) return;
+    try { await canteenApi.refunds.delete(confirm.target.id); showToast('✅ 已删除'); load(); }
+    catch (e: any) { showToast('删除失败', e.message, 'destructive'); }
+    finally { setConfirm({ open: false, target: null }); }
+  };
+
+  const handleFile = async (f: File | undefined | null) => {
+    if (!f) return;
+    setFileName(f.name); setResult(null);
+    try {
+      const buf = await f.arrayBuffer();
+      let text = '';
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+      catch { try { text = new TextDecoder('gbk').decode(buf); } catch { text = new TextDecoder('utf-8', { fatal: false }).decode(buf); } }
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length < 2) { showToast('解析失败', 'CSV 数据不足', 'destructive'); return; }
+      const parseLine = (line: string): string[] => {
+        const out: string[] = []; let cur = ''; let inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+          else if (ch === ',' && !inQ) { out.push(cur); cur = ''; }
+          else cur += ch;
+        }
+        out.push(cur);
+        return out.map((s) => s.trim().replace(/^"|"$/g, ''));
+      };
+      const header = parseLine(lines[0]);
+      setCsvHeaders(header);
+      setCsvPreview(lines.slice(1, 6).map(parseLine));
+      const norm = (h: string) => h.replace(/[|｜]/g, '').replace(/\s+/g, '').toLowerCase();
+      const headerNorm = header.map(norm);
+      const auto = (targets: string[]) => {
+        for (const t of targets) {
+          const idx = headerNorm.findIndex((h) => h.includes(t));
+          if (idx >= 0) return header[idx];
+        }
+        return '';
+      };
+      setMapping({
+        external_sn: auto(['卡流水号', '流水号', 'externalsn']),
+        user_name: auto(['姓名', '用户名', 'username']),
+        user_id: auto(['工号', 'userid']),
+        user_department: auto(['部门名称', '部门', 'department']),
+        department_code: auto(['部门编号', 'departmentcode']),
+        card_no: auto(['卡号', 'cardno']),
+        refund_date: auto(['退款时间', '退款日期', '时间', 'refunddate']),
+        amount: auto(['退款金额', '金额', 'amount']),
+        balance_recorded: auto(['卡上余额', '卡余额', '余额', 'balance']),
+        operator: auto(['操作员', 'operator']),
+        machine_no: auto(['机号', 'machineno']),
+        bill_no: auto(['收支统计账单号', '账单号', 'billno']),
+        remark: '',
+      });
+    } catch (e: any) { showToast('读取失败', e.message, 'destructive'); }
+  };
+
+  const doImport = async () => {
+    if (!fileRef.current?.files?.[0]) { showToast('请选择文件', '', 'destructive'); return; }
+    setImporting(true);
+    try {
+      const r = await canteenApi.refunds.importCsv(fileRef.current.files[0], mode, mapping);
+      if (r.ok && r.data) {
+        const d = r.data;
+        showToast(`✅ 导入完成：新增 ${d.inserted}，更新 ${d.updated}${d.skipped ? `，跳过 ${d.skipped}` : ''}${d.errors?.length ? `，失败 ${d.errors.length}` : ''}`);
+        setImportOpen(false);
+        setFileName(''); setCsvHeaders([]); setCsvPreview([]); setResult(null);
+        if (fileRef.current) fileRef.current.value = '';
+      } else {
+        showToast('导入失败', r.error || '未知错误', 'destructive');
+      }
+      load();
+    } catch (e: any) { showToast('导入失败', e.message, 'destructive'); }
+    finally { setImporting(false); }
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">退费记录</h3>
+          <div className="flex gap-2 items-center">
+            <Input type="month" className="h-8 w-36" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <Input className="h-8 w-36" placeholder="搜索姓名/工号/卡号" value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(1); }} />
+            <Button size="sm" variant="outline" onClick={() => { setFileName(''); setCsvHeaders([]); setCsvPreview([]); setResult(null); setImportOpen(true); }}>
+              <Upload className="mr-1 h-4 w-4" />导入
+            </Button>
+          </div>
+        </div>
+        {(summary.count > 0 || list.length > 0) && (
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="bg-red-50 text-red-700 rounded px-2 py-1">月退费 <b>{fmt(summary.total)}</b></span>
+            <span className="bg-slate-100 rounded px-2 py-1">{summary.count} 笔</span>
+            <span className="bg-slate-100 rounded px-2 py-1">{summary.people} 人</span>
+          </div>
+        )}
+        <div ref={scrollRef} className="relative overflow-y-auto max-h-[45vh] rounded-md border" onScroll={(e) => {
+          const el = e.currentTarget;
+          if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) loadMore();
+        }}>
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-slate-100">
+              <tr className="border-b">
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap w-12">序号</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">姓名</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">部门</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">工号</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">卡号</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">流水号</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">退款日期</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">退费金额</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">卡上余额</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">操作员</th>
+                <th className="px-2 py-2 text-center font-medium whitespace-nowrap">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length === 0 ? (
+                <tr><td colSpan={11} className="h-16 text-center text-muted-foreground text-sm">暂无退费记录，点击「导入」批量导入</td></tr>
+              ) : list.map((r, idx) => (
+                <tr key={r.id} className="border-b hover:bg-muted/50">
+                  <td className="px-2 py-1.5 text-center text-muted-foreground">{idx + 1}</td>
+                  <td className="px-2 py-1.5 text-center font-medium">{r.user_name}</td>
+                  <td className="px-2 py-1.5 text-center">{r.user_department || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.user_id || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.card_no || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.external_sn || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.refund_date || '-'}</td>
+                  <td className="px-2 py-1.5 text-center font-medium text-red-600">{fmt(r.amount)}</td>
+                  <td className="px-2 py-1.5 text-center">{r.balance_recorded != null ? fmt(r.balance_recorded) : '-'}</td>
+                  <td className="px-2 py-1.5 text-center">{r.operator || '-'}</td>
+                  <td className="px-2 py-1.5 text-center">
+                    <Button variant="ghost" size="icon" onClick={() => setConfirm({ open: true, target: r })}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                  </td>
+                </tr>
+              ))}
+              {list.length > 0 && (() => {
+                const sumAmt = list.reduce((s: number, r: any) => s + (Number(r.amount) || 0), 0);
+                const sumBal = list.reduce((s: number, r: any) => s + (Number(r.balance_recorded) || 0), 0);
+                return (
+                  <tr className="bg-red-50/70 font-semibold">
+                    <td className="px-2 py-1.5 text-center text-red-900" colSpan={6}>合计</td>
+                    <td className="px-2 py-1.5 text-center text-red-900">{list.length} 笔</td>
+                    <td className="px-2 py-1.5 text-center font-medium text-red-700">{fmt(sumAmt)}</td>
+                    <td className="px-2 py-1.5 text-center text-red-900">{fmt(sumBal)}</td>
+                    <td className="px-2 py-1.5 text-center text-red-900" colSpan={2}></td>
+                  </tr>
+                );
+              })()}
+            </tbody>
+          </table>
+          {loadingMore && <div className="py-2 text-center text-xs text-muted-foreground">加载中…</div>}
+          {!loadingMore && list.length >= total && list.length > 0 && <div className="py-2 text-center text-xs text-muted-foreground">已加载全部 {total} 条</div>}
+        </div>
+      </CardContent>
+
+      {/* 导入弹窗 */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="sm:max-w-[680px] max-h-[85vh] flex flex-col">
+          <DialogHeader><DialogTitle>导入退费 CSV</DialogTitle></DialogHeader>
+          <div className="space-y-3 overflow-y-auto pr-1">
+            <div className="flex items-center gap-2">
+              <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload className="mr-1 h-4 w-4" />选择 CSV 文件</Button>
+              {fileName && <span className="text-xs text-muted-foreground">{fileName}</span>}
+            </div>
+
+            {csvHeaders.length > 0 && (
+              <>
+                <div className="rounded-md border overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-slate-100">
+                        {csvHeaders.map((h, i) => <th key={i} className="px-2 py-1 whitespace-nowrap text-center">{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvPreview.map((row, i) => (
+                        <tr key={i} className="border-t">
+                          {csvHeaders.map((_, j) => <td key={j} className="px-2 py-1 whitespace-nowrap">{row[j] || ''}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">字段映射（自动匹配，可调整）</p>
+                  {REFUND_FIELDS.map((fld) => (
+                    <div key={fld.key} className="flex items-center gap-2 text-sm">
+                      <span className={`w-24 shrink-0 ${fld.required ? 'text-red-600 font-medium' : 'text-slate-600'}`}>
+                        {fld.label}{fld.required ? ' *' : ''}
+                      </span>
+                      <select className="flex-1 h-8 rounded-md border px-2 text-sm" value={mapping[fld.key] || ''}
+                        onChange={(e) => setMapping({ ...mapping, [fld.key]: e.target.value })}>
+                        <option value="">不导入</option>
+                        {csvHeaders.map((h) => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                      {fld.hint && <span className="text-[11px] text-muted-foreground shrink-0">{fld.hint}</span>}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="text-muted-foreground">导入模式：</span>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input type="radio" checked={mode === 'upsert'} onChange={() => setMode('upsert')} /> 更新导入（存在则更新）
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input type="radio" checked={mode === 'skip'} onChange={() => setMode('skip')} /> 仅新增（重复跳过）
+                  </label>
+                </div>
+              </>
+            )}
+
+            {result && (
+              <div className="rounded-md border bg-slate-50 p-3 text-sm space-y-1">
+                <p className="font-medium">导入结果</p>
+                <div className="grid grid-cols-2 gap-x-4 text-xs">
+                  <span>总行数：{result.total}</span>
+                  <span className="text-green-600">新增：{result.inserted}</span>
+                  <span className="text-blue-600">更新：{result.updated}</span>
+                  <span className="text-amber-600">跳过：{result.skipped}</span>
+                </div>
+                {result.errors?.length > 0 && (
+                  <div className="mt-1">
+                    <p className="text-red-600 text-xs">失败 {result.errors.length} 行：</p>
+                    <div className="max-h-28 overflow-y-auto space-y-0.5">
+                      {result.errors.map((e: any, i: number) => <p key={i} className="text-[11px] text-red-500">第 {e.row} 行：{e.reason}</p>)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <DialogClose asChild><Button variant="outline">关闭</Button></DialogClose>
+            <Button onClick={doImport} disabled={!fileName || importing}>{importing ? '导入中…' : '开始导入'}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirm.open} onOpenChange={(v) => setConfirm({ open: v, target: confirm.target })}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader><DialogTitle>确认操作</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">删除 {confirm.target?.user_name || ''} 的退费记录（{confirm.target?.external_sn || ''}）？</p>
+          <div className="flex justify-end gap-2">
+            <DialogClose asChild><Button variant="outline">取消</Button></DialogClose>
+            <Button variant="destructive" onClick={del}>确认删除</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 export default function IncomeTab() {
   return (
     <Tabs defaultValue="income">
       <TabsList className="bg-slate-100 p-1 rounded-lg">
         <TabsTrigger value="income">每日收入</TabsTrigger>
         <TabsTrigger value="recharge">饭卡充值</TabsTrigger>
+        <TabsTrigger value="refund">饭卡退费</TabsTrigger>
         <TabsTrigger value="resource">资源占用费</TabsTrigger>
       </TabsList>
       <TabsContent value="income"><IncomePanel /></TabsContent>
       <TabsContent value="recharge"><RechargePanel /></TabsContent>
+      <TabsContent value="refund"><RefundPanel /></TabsContent>
       <TabsContent value="resource"><ResourceFeePanel /></TabsContent>
     </Tabs>
   );

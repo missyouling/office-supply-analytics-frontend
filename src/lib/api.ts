@@ -189,6 +189,7 @@ export const canteenApi = {
     topSupplies: (month?: string, limit?: number) => req<ApiResponse>(C + '/analytics/top-supplies' + qs({ month, limit })),
     monthlyCompare: (params?: any) => req<ApiResponse>(C + '/analytics/monthly-compare' + qs(params || {})),
     suggestions: (month?: string) => req<ApiResponse>(C + '/analytics/suggestions' + qs({ month })),
+    costSummary: (params?: any) => req<ApiResponse>(C + '/analytics/cost-summary' + qs(params || {})),
   },
   // 饭卡充值
   recharges: {
@@ -201,6 +202,19 @@ export const canteenApi = {
       fd.append('mode', mode);
       fd.append('mapping', JSON.stringify(mapping));
       return fetch(C + '/recharges/import', { method: 'POST', body: fd }).then((r) => r.json());
+    },
+  },
+  // 饭卡退费
+  refunds: {
+    list: (params?: any) => req<PaginatedResult<any>>(C + '/refunds' + qs(params || {})),
+    summary: (month?: string) => req<ApiResponse>(C + '/refunds/summary' + qs({ month })),
+    delete: (id: number) => req<ApiResponse>(C + '/refunds/' + id, { method: 'DELETE' }),
+    importCsv: (file: File, mode: string, mapping: Record<string, string>) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('mode', mode);
+      fd.append('mapping', JSON.stringify(mapping));
+      return fetch(C + '/refunds/import', { method: 'POST', body: fd }).then((r) => r.json());
     },
   },
 };
