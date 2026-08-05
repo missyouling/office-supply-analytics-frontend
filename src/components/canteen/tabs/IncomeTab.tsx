@@ -1085,8 +1085,15 @@ function RechargePanel() {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">选择刷卡机导出的 CSV 文件（支持中控消费机系统）</label>
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
-              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload className="mr-1 h-4 w-4" />选择文件</Button>
-              {fileName && <span className="text-xs text-muted-foreground">{fileName}</span>}
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload className="mr-1 h-4 w-4" />选择文件</Button>
+                {fileName && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    {fileName}
+                    <button className="text-red-500 hover:text-red-700" onClick={() => { setFileName(''); setCsvHeaders([]); setCsvPreview([]); }}><X className="h-3 w-3" /></button>
+                  </span>
+                )}
+              </div>
             </div>
 
             {csvHeaders.length > 0 && (
@@ -1448,8 +1455,15 @@ function RefundPanel() {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">选择刷卡机导出的 CSV 文件（支持中控消费机系统）</label>
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
-              <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload className="mr-1 h-4 w-4" />选择文件</Button>
-              {fileName && <span className="text-xs text-muted-foreground">{fileName}</span>}
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Upload className="mr-1 h-4 w-4" />选择文件</Button>
+                {fileName && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    {fileName}
+                    <button className="text-red-500 hover:text-red-700" onClick={() => { setFileName(''); setCsvHeaders([]); setCsvPreview([]); }}><X className="h-3 w-3" /></button>
+                  </span>
+                )}
+              </div>
             </div>
 
             {csvHeaders.length > 0 && (
